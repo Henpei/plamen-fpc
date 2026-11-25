@@ -499,11 +499,12 @@ begin
       Delete(p.inv, i, 1);
     end;
   for i := 0 to High(GClasses[ci].seedSkills) do
-    if FindSkill(GClasses[ci].seedSkills[i]) >= 0 then
-    begin
-      SetLength(p.skills, Length(p.skills) + 1);
-      p.skills[High(p.skills)] := GClasses[ci].seedSkills[i];
-    end;
+  begin
+    if FindSkill(GClasses[ci].seedSkills[i]) < 0 then
+      FatalF('class %s: seed skill "%s" not in skills.dat (load-time validation should have caught this)', [classId, GClasses[ci].seedSkills[i]]);
+    SetLength(p.skills, Length(p.skills) + 1);
+    p.skills[High(p.skills)] := GClasses[ci].seedSkills[i];
+  end;
   // starter spells: class school spells lvl<=2
   for i := 0 to High(GSpells) do
     if (GSpells[i].lvl <= 2) then

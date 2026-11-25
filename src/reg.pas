@@ -81,6 +81,7 @@ var
 procedure LoadAllData;   // loads data/*.dat into GDB + registries; FATAL on any problem
 procedure LoadMonstersFrom(const path: string);  // public so selftest can prove data-only adds
 procedure LoadSpellsFrom(const path: string);
+function ValidateClassSeedIds: string;  // '' = ok; else error naming class + unknown skill id (load-time LOUD fail)
 
 { finders — return index or -1 }
 function FindStat(const id: string): Integer;
@@ -249,6 +250,7 @@ var
   i, j: Integer;
   sec: string;
   parts: TStrArray;
+  err: string;
 begin
   GDB.files := nil;
   DataLoad(GDB, F_STATS);
@@ -629,11 +631,26 @@ begin
     end;
   end;
 
+  // loud validation (no silent skips): every class seed skill id must exist in skills.dat
+  err := ValidateClassSeedIds;
+  if err <> '' then FatalF('data validation failed: %s', [err]);
+
   Log(Format('data loaded: %d stats, %d elements, %d races, %d classes, %d skills, %d spells, %d monsters, %d affixes, %d pools, %d items, %d uniques, %d tables, %d npcs, %d quests, %d rules, %d lore, %d stores, %d regions, %d builds',
     [Length(GStats), Length(GElements), Length(GRaces), Length(GClasses), Length(GSkills),
      Length(GSpells), Length(GMonsters), Length(GAffixes), Length(GPools), Length(GItems),
      Length(GUniques), Length(GDropTables), Length(GNpcs), Length(GQuests), Length(GRules),
      Length(GLore), Length(GStores), Length(GRegions), Length(GBuilds)]));
+end;
+
+function ValidateClassSeedIds: string;
+var
+  i, j: Integer;
+begin
+  Result := '';
+  for i := 0 to High(GClasses) do
+    for j := 0 to High(GClasses[i].seedSkills) do
+      if FindSkill(GClasses[i].seedSkills[j]) < 0 then
+        Exit(Format('classes.dat [class:%s] seed_skills references unknown skill "%s" (not in data/skills.dat)', [GClasses[i].id, GClasses[i].seedSkills[j]]));
 end;
 
 { generic finders }

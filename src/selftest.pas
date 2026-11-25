@@ -55,6 +55,7 @@ var
   items: TItemArr;
   gold: Integer;
   syms: array of TSymbol;
+  savedSeeds: TStrArray;
 begin
   gPass := 0; gFail := 0; gLog := '';
   TLog('=== PLAMEN selftest commit=' + VERSION_STAMP + ' ===');
@@ -257,6 +258,29 @@ begin
   Check(FindMonster('selftest_drake') >= 0, 'new monster added via data file alone');
   Check(FindSpell('selftest_zap') >= 0, 'new spell added via data file alone');
   DeleteFile('data/_selftest_extra.dat');
+
+  { ---- 12. class seed skills: load-time validation + granted at chargen (fix pass) ---- }
+  Check(ValidateClassSeedIds = '', 'ValidateClassSeedIds: all class seed ids exist in skills.dat');
+  savedSeeds := GClasses[0].seedSkills;
+  SetLength(GClasses[0].seedSkills, 1);
+  GClasses[0].seedSkills[0] := 'no_such_skill_xyz';
+  Check(ValidateClassSeedIds <> '', 'ValidateClassSeedIds catches unknown seed id (loud-fail contract)');
+  GClasses[0].seedSkills := savedSeeds;
+  Check(ValidateClassSeedIds = '', 'ValidateClassSeedIds clean again after restore');
+  for i := 0 to High(GClasses) do
+  begin
+    NewPlayer(p, 'SeedT', GRaces[0].id, GClasses[i].id, False);
+    ok := Length(GClasses[i].seedSkills) > 0;
+    for j := 0 to High(GClasses[i].seedSkills) do
+    begin
+      has := False;
+      for k := 0 to High(p.skills) do
+        if p.skills[k] = GClasses[i].seedSkills[j] then has := True;
+      if not has then ok := False;
+    end;
+    Check(ok and (Length(p.skills) >= Length(GClasses[i].seedSkills)),
+      Format('class %s grants its %d seed skills at chargen', [GClasses[i].id, Length(GClasses[i].seedSkills)]));
+  end;
 
   { ---- done ---- }
   TLog(Format('=== selftest done: %d passed, %d failed ===', [gPass, gFail]));
