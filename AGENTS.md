@@ -6,8 +6,10 @@ PLAMEN — hardcore isometric action RPG. Side 2 build: **Free Pascal, FPC 3.2.2
 ## Build & run (always from repo root)
 - `make` / `make all` — writes `src/version.inc` (git hash) and compiles `build/plamen` with fpc.
 - `make run` — build + run the game (needs a display; without `DISPLAY` the binary exits loudly with RC=2, by design).
-- `make selftest` — build + run `build/plamen selftest` headless; RC=0 = all pass, log in `selftest.log`.
+- `make selftest` — build + run `build/plamen selftest` headless; RC=0 = all pass (currently 82), log in `selftest.log`.
+- `./build/plamen shot` — scripted graphical smoke run (title/chargen/hub/combat screenshots `shot_*.png`, then exits). Requires DISPLAY.
 - `make clean`.
+- Content bulk is generated: `python3 tools/gen_content.py` (deterministic; rewrites skills/builds/uniques/lore/quests_side/maps). Hand-edit story-critical files (quests.dat, dialog.dat, rules.dat, npcs.dat, monsters.dat, drops.dat...).
 
 ## Layout
 - `src/plamen.dpr` — entry point, arg parsing (`selftest`), state machine.
@@ -31,8 +33,11 @@ PLAMEN — hardcore isometric action RPG. Side 2 build: **Free Pascal, FPC 3.2.2
 - Swedish UI text is fine (UTF-8); font is loaded with explicit codepoints incl. åäö ÅÄÖ.
 - New content (monster/spell/item/quest/lore) = data file entry only; selftest `data_add_monster` proves it.
 
-## Known platform pitfalls
+## Known platform pitfalls (learned the hard way, do not rediscover)
+- fpc objfpc mode: **no inline `var` statements mid-block, no `for var` loops, no expression-position `if..then..else`, no multi-statement `case` branches without begin/end, and `and` binds TIGHTER than `=` (always parenthesize `(a = b) and c`)**. `tools/hoist_vars.py` hoists inline vars if needed. Reserved words bit us: `label` is reserved (use `caption`/`lab`).
 - raylib needs a display + GL. Headless box: use `selftest` arg; graphical run without DISPLAY fails loudly (RC=2) — intended.
-- raylib 6.x: `LoadFontEx` wants an explicit codepoint array; default font lacks åäö. We load DejaVu (see `core.pas` font candidates; none found = fatal).
+- raylib 6.x: `LoadFontEx` wants an explicit codepoint array; default font lacks åäö. We load DejaVu with codepoints 32..126 + åäöÅÄÖ + dashes (see `render.LoadGameFont`; none found = fatal). `IsFontReady` does not exist in 6.2 — it is `IsFontValid`.
+- raylib `DrawTriangle` culls clockwise winding (y-down screen): tiles must be drawn CCW or they vanish (found via shot_*.png).
 - fpc + raylib: `{$linklib raylib}` works because `libraylib.so` is in `/usr/lib`.
-- Save files: binary, header magic `PLAMSAVE`, version, CRC32 of payload; tamper/corrupt = fatal load error (loud), never auto-repair.
+- Open-array (`array of T`) params cannot be SetLength'd — use named dynamic types (`TItemArr`, `TFlatArr` in sim).
+- Save files: magic `PLAMSAVE` + version + CRC32 (case-insensitive hex compare!) of payload; tamper/corrupt = rejected loudly, never auto-repaired. Field separator inside save lines is `;` because item stats use `|`.

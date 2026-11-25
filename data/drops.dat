@@ -48,3 +48,18 @@ entries=health_vial:0.5:1:30:1|mana_vial:0.4:1:30:1|gold:0.8:0:0:0
 
 [table:t_chest_rare]
 entries=u:grave_ring:0.10:1:30:1|gold:1:0:0:0|health_vial:0.6:1:30:1
+
+[table:t_boss_ash_warlord]
+entries=ashbrand:1:8:30:1|u:ash_standard:1:8:30:1|health_vial:1:1:30:2|gold:0:0:0:0
+
+[table:t_boss_veil_treant]
+entries=u:thorncrown:1:11:30:1|u:choir_seed:1:11:30:1|mana_vial:1:1:30:2
+
+[table:t_boss_glass_colossus]
+entries=u:glass_eye:1:14:30:1|u:mirage_edge:1:14:30:1|gold:0:0:0:0
+
+[table:t_boss_drowned_colossus]
+entries=u:drowned_helm:1:17:30:1|u:tidecaller:1:17:30:1|mana_vial:1:1:30:2
+
+[table:t_boss_storm_prelate]
+entries=u:stormcrown_scepter:1:20:30:1|u:crown_bell:1:20:30:1|gold:0:0:0:0

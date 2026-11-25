@@ -286,7 +286,7 @@ gen_map("emberfall_area1","Ashen Flats","emberfall","area",seed=12,
         spawns=[("ember_hound",5,5),("cinder_imp",4,6),("banner_cultist",2,8),("ash_brute",2,7)],
         chests=["t_chest"], lores=["lore_ember_banner","lore_ember_3"], markers={"war_banner":"War Banner"})
 gen_map("emberfall_area2","Cinder Slopes","emberfall","area",seed=13,
-        portals=[("cinderhold",24,10)],
+        portals=[("cinderhold",24,10)], boss="ash_warlord",
         spawns=[("sulfur_spider",6,5),("ash_brute",3,7),("cinder_imp",3,6)],
         chests=["t_chest"], lores=["lore_cinder_2"], markers={"shrine_ember":"Old Shrine"})
 gen_map("emberfall_dungeon","Maw of Emberfall","emberfall","dungeon",seed=14,
@@ -302,7 +302,7 @@ gen_map("veil_area1","Whispering Green","veil","area",seed=22,
         spawns=[("thorn_stalker",5,6),("mire_wurm",2,8),("veil_mote",3,6)],
         chests=["t_chest"], lores=["lore_veil_1"])
 gen_map("veil_area2","The Moving Dark","veil","area",seed=23,
-        portals=[("veil_hub",24,10)],
+        portals=[("veil_hub",24,10)], boss="veil_treant",
         spawns=[("mire_wurm",3,7),("thorn_stalker",4,6)],
         chests=["t_chest_rare"], lores=["lore_veil_2","lore_veil_4","lore_ithra_stone"], markers={"runestone_a":"Runestone A","runestone_b":"Runestone B"})
 gen_map("veil_dungeon","Library Deep","veil","dungeon",seed=24,
@@ -318,7 +318,7 @@ gen_map("glass_area1","First Mirage","glass","area",seed=32,
         spawns=[("mirror_wraith",5,6),("glass_scorpion",4,6)],
         chests=["t_chest"], lores=["lore_glass_mirage","lore_glass_3"])
 gen_map("glass_area2","The Showing","glass","area",seed=33,
-        portals=[("glass_hub",24,10)],
+        portals=[("glass_hub",24,10)], boss="glass_colossus",
         spawns=[("mirage_knight",3,7),("mirror_wraith",4,6)],
         chests=["t_chest_rare"], lores=["lore_glass_2"])
 gen_map("glass_dungeon","Bottling Vault","glass","dungeon",seed=34,
@@ -334,7 +334,7 @@ gen_map("maren_area1","Sunken Streets","maren","area",seed=42,
         spawns=[("drowned_knight",4,6),("tide_leech",5,6)],
         chests=["t_chest"], lores=["lore_maren_tide"], npc_floor=[(18,14)])
 gen_map("maren_area2","Air-Pocket Delve","maren","area",seed=43,
-        portals=[("maren_hub",24,10)],
+        portals=[("maren_hub",24,10)], boss="drowned_colossus",
         spawns=[("air_squid",4,6),("drowned_knight",3,7)],
         chests=["t_chest_rare"], lores=["lore_maren_3","lore_maren_4"])
 gen_map("maren_dungeon","Sunken Temple","maren","dungeon",seed=44,
@@ -350,7 +350,7 @@ gen_map("crown_area1","Frozen Stair","crown","area",seed=52,
         spawns=[("storm_revenant",5,6),("frost_giant",2,8)],
         chests=["t_chest"], lores=["lore_crown_1"])
 gen_map("crown_area2","The Whispering Ridge","crown","area",seed=53,
-        portals=[("crown_hub",24,10)],
+        portals=[("crown_hub",24,10)], boss="storm_prelate",
         spawns=[("frost_giant",3,8),("storm_revenant",4,6)],
         chests=["t_chest_rare"], lores=["lore_crown_2"])
 gen_map("crown_dungeon","Heart of the Crown","crown","dungeon",seed=54,
