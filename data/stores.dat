@@ -1,0 +1,33 @@
+# Stores (brief 4.7). Gilded Compact policy; stock gated by compact.trust (minTrust),
+# prices respond to flags compact.supply_glass / compact.block_maren / store.price_mul
+# and race store_mul (stormcrowned pays +10%). Stock rotates with the day counter.
+
+[store:cinderhold_store]
+name=Wrong Magni's Emporium
+npc=wrong_magni
+map=cinderhold
+stock=health_vial:20:0|mana_vial:20:0|rusted_blade:3:0|rapier:2:0|parry_blade:2:0|duelist_leather:2:0|miner_gloves:3:0|tread_boots:2:0|travel_pack:2:0|rune_ring:1:2|ash_hood:1:2|cinder_charm:1:3
+
+[store:veil_store]
+name=Choir Barter-Nest
+npc=choir_druid
+map=veil_hub
+stock=health_vial:15:0|mana_vial:15:0|veil_mask:1:0|swift_gloves:1:0|light_wand:1:1|dawn_shard:1:2
+
+[store:glass_store]
+name=Mirage Stall (Compact)
+npc=wrong_magni
+map=glass_hub
+stock=health_vial:12:0|mana_vial:12:0|storm_boots:1:1|ash_tome:1:1|rune_ring:1:2|mana_vial:0:0
+
+[store:maren_store]
+name=Sunken Exchange (Compact)
+npc=compact_factor
+map=maren_hub
+stock=health_vial:15:0|mana_vial:15:0|travel_pack:2:0|dawn_shard:1:1|tideborn_gear:1:3
+
+[store:crown_store]
+name=Citadel Quartermaster
+npc=wrong_magni
+map=crown_hub
+stock=health_vial:10:3|mana_vial:10:3|storm_boots:1:3|ashbrand:1:5

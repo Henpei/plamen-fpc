@@ -3,15 +3,15 @@ program plamen;
 uses
   SysUtils,
   core in 'core.pas',
-  raylib in 'raylib.pas';
+  raylib in 'raylib.pas',
+  selftest in 'selftest.pas';
 var
   frames: Integer;
 begin
   Log('PLAMEN boot commit=' + VERSION_STAMP + ' built=' + BUILD_TIME);
   if (ParamCount >= 1) and (ParamStr(1) = 'selftest') then
   begin
-    Writeln('selftest: placeholder (suite not wired yet)');
-    Halt(0);
+    Halt(RunSelftest);
   end;
   if GetEnvironmentVariable('DISPLAY') = '' then
   begin

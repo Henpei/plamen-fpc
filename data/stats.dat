@@ -1,0 +1,162 @@
+# PLAMEN stat registry — ONE shared formula system for gear, enemies, player.
+# kind=flat:    base value, gear/race/buffs add to it.   final = base + sum(flat bonuses)
+# kind=derived: formula over attrs (might/wits/grace/spirit/resolve), level, and flat stats.
+#               final = eval(formula) + sum(flat bonuses to this stat)
+# Add a new stat = add a section here. Combat code never changes (brief 4.1).
+# Identifiers allowed in formulas: might wits grace spirit resolve level + any flat stat id.
+# Derived stats may NOT reference other derived stats (loud error if they do).
+
+[stat:max_hp]
+kind=derived
+name=Max HP
+formula=30 + might*8 + level*4
+
+[stat:max_mana]
+kind=derived
+name=Max Mana
+formula=10 + spirit*7 + wits*2
+
+[stat:max_stamina]
+kind=derived
+name=Stamina
+formula=20 + resolve*4 + grace*2
+
+[stat:melee_dmg]
+kind=derived
+name=Melee Damage
+formula=4 + might*2.2 + level*0.5
+
+[stat:spell_dmg]
+kind=derived
+name=Spell Damage
+formula=3 + wits*2 + spirit*2 + level*0.4
+
+[stat:crit_chance]
+kind=derived
+name=Crit Chance %
+formula=5 + grace*0.4
+
+[stat:crit_dmg]
+kind=derived
+name=Crit Damage %
+formula=150 + wits*1
+
+[stat:move_speed]
+kind=derived
+name=Move Speed
+formula=3.0 + grace*0.05 + level*0.01
+
+[stat:attack_speed]
+kind=derived
+name=Attack Speed mult
+formula=1.0 + grace*0.012
+
+[stat:armor]
+kind=derived
+name=Armor
+formula=resolve*0.8
+
+[stat:block]
+kind=derived
+name=Block %
+formula=10 + resolve*0.5
+
+[stat:carry]
+kind=derived
+name=Carry Capacity
+formula=40 + might*5
+
+[stat:hp_regen]
+kind=derived
+name=HP regen/s
+formula=0.4 + resolve*0.12
+
+[stat:mana_regen]
+kind=derived
+name=Mana regen/s
+formula=1.0 + spirit*0.15
+
+[stat:stamina_regen]
+kind=derived
+name=Stamina regen/s
+formula=4 + resolve*0.3
+
+[stat:backstab_mul]
+kind=derived
+name=Backstab multiplier
+formula=1.5 + grace*0.01
+
+[stat:xp_gain]
+kind=derived
+name=XP gain %
+formula=100
+
+[stat:gold_find]
+kind=derived
+name=Gold find %
+formula=100
+
+[stat:fire_res]
+kind=flat
+name=Fire Resist %
+base=0
+
+[stat:water_res]
+kind=flat
+name=Water Resist %
+base=0
+
+[stat:nature_res]
+kind=flat
+name=Nature Resist %
+base=0
+
+[stat:storm_res]
+kind=flat
+name=Storm Resist %
+base=0
+
+[stat:void_res]
+kind=flat
+name=Void Resist %
+base=0
+
+[stat:all_res]
+kind=flat
+name=All Resist %
+base=0
+
+[stat:lifesteal]
+kind=flat
+name=Lifesteal %
+base=0
+
+[stat:thorns]
+kind=flat
+name=Thorns
+base=0
+
+[stat:parry]
+kind=flat
+name=Parry chance %
+base=0
+
+[stat:dodge_chance]
+kind=flat
+name=Bonus dodge chance %
+base=0
+
+[stat:magic_find]
+kind=flat
+name=Magic find %
+base=0
+
+[stat:element_dmg]
+kind=flat
+name=Element damage %
+base=0
+
+[stat:melee_dmg_pct]
+kind=flat
+name=Melee damage %
+base=0

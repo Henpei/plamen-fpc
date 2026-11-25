@@ -27,6 +27,7 @@ procedure FatalF(const fmt: string; const args: array of const);
 { String utils }
 function Trim(const s: string): string;
 function Split(const s: string; sep: Char): TStrArray;
+function SplitStr(const s, sep: string): TStrArray;
 function Join(const parts: TStrArray; const sep: string): string;
 function StartsWith(const s, pre: string): Boolean;
 function Contains(const s, sub: string): Boolean;
@@ -136,6 +137,7 @@ function Split(const s: string; sep: Char): TStrArray;
 var
   i, start: Integer;
 begin
+  Result := nil;
   SetLength(Result, 0);
   start := 1;
   for i := 1 to Length(s) do
@@ -145,6 +147,35 @@ begin
       Result[High(Result)] := Copy(s, start, i - start);
       start := i + 1;
     end;
+  SetLength(Result, Length(Result) + 1);
+  Result[High(Result)] := Copy(s, start, Length(s) - start + 1);
+end;
+
+function SplitStr(const s, sep: string): TStrArray;
+var
+  i, start: Integer;
+begin
+  Result := nil;
+  if sep = '' then
+  begin
+    SetLength(Result, 1);
+    Result[0] := s;
+    Exit;
+  end;
+  start := 1;
+  i := 1;
+  while i <= Length(s) do
+  begin
+    if Copy(s, i, Length(sep)) = sep then
+    begin
+      SetLength(Result, Length(Result) + 1);
+      Result[High(Result)] := Copy(s, start, i - start);
+      Inc(i, Length(sep));
+      start := i;
+    end
+    else
+      Inc(i);
+  end;
   SetLength(Result, Length(Result) + 1);
   Result[High(Result)] := Copy(s, start, Length(s) - start + 1);
 end;

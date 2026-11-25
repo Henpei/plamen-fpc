@@ -1,0 +1,62 @@
+# GENERATED — 12 endgame builds, verified by selftest build-path simulation.
+
+[build:b_wardancer_crit]
+name=Crit Wardancer
+class=wardancer
+nodes=wardancer_t1_1|wardancer_t1_2|wardancer_t2_6|wardancer_t2_7|wardancer_t3_11|wardancer_t3_12|wardancer_t4_16|wardancer_t4_17|wardancer_t5_21|wardancer_t5_22
+
+[build:b_wardancer_tank]
+name=Parry Tank Wardancer
+class=wardancer
+nodes=wardancer_t1_1|wardancer_t1_2|wardancer_t2_6|wardancer_t2_8|wardancer_t3_11|wardancer_t3_13|wardancer_t4_16|wardancer_t4_18|wardancer_t5_21|wardancer_t5_22
+
+[build:b_emberweaver_aoe]
+name=AoE Emberweaver
+class=emberweaver
+nodes=emberweaver_t1_1|emberweaver_t1_2|emberweaver_t2_6|emberweaver_t2_7|emberweaver_t3_11|emberweaver_t3_12|emberweaver_t4_16|emberweaver_t4_17|emberweaver_t5_21|emberweaver_t5_22
+
+[build:b_emberweaver_dot]
+name=Dot Emberweaver
+class=emberweaver
+nodes=emberweaver_t1_1|emberweaver_t1_2|emberweaver_t2_6|emberweaver_t2_8|emberweaver_t3_11|emberweaver_t3_13|emberweaver_t4_16|emberweaver_t4_18|emberweaver_t5_21|emberweaver_t5_22
+
+[build:b_runeforger]
+name=Battlemage Runeforger
+class=runeforger
+nodes=runeforger_t1_1|runeforger_t2_6|runeforger_t2_7|runeforger_t3_11|runeforger_t3_12|arcana_t1_1|arcana_t2_6|arcana_t2_7|arcana_t3_11|arcana_t3_12
+
+[build:b_shadowpact]
+name=Lifesteal Shadowpact
+class=shadowpact
+nodes=shadowpact_t1_1|shadowpact_t1_2|shadowpact_t2_6|shadowpact_t2_7|shadowpact_t3_11|shadowpact_t3_12|shadowpact_t4_16|shadowpact_t4_17|shadowpact_t5_21|shadowpact_t5_22
+
+[build:b_hound_tank]
+name=Vanguard Hound
+class=wardens_hound
+nodes=wardens_hound_t1_1|wardens_hound_t1_2|wardens_hound_t2_6|wardens_hound_t2_7|wardens_hound_t3_11|wardens_hound_t3_12|wardens_hound_t4_16|wardens_hound_t4_17|wardens_hound_t5_21|wardens_hound_t5_22
+
+[build:b_lightbinder]
+name=Support Lightbinder
+class=lightbinder
+nodes=lightbinder_t1_1|lightbinder_t1_2|lightbinder_t2_6|lightbinder_t2_7|lightbinder_t3_11|lightbinder_t3_12|lightbinder_t4_16|lightbinder_t4_17|lightbinder_t5_21|lightbinder_t5_22
+
+[build:b_hybrid_arcane]
+name=Arcane Hybrid
+class=emberweaver
+nodes=emberweaver_t1_1|emberweaver_t2_6|emberweaver_t2_7|emberweaver_t3_11|emberweaver_t3_12|arcana_t1_1|arcana_t2_6|arcana_t2_7|arcana_t3_11|arcana_t3_12
+
+[build:b_mobility]
+name=Storm Dancer
+class=wardancer
+nodes=movement_t1_1|movement_t2_6|movement_t2_7|movement_t3_11|movement_t3_12|wardancer_t1_1|wardancer_t2_6|wardancer_t2_7|wardancer_t3_11|wardancer_t3_12
+
+[build:b_crafter]
+name=War Crafter
+class=runeforger
+nodes=crafting_t1_1|crafting_t2_6|crafting_t2_7|crafting_t3_11|crafting_t3_12|runeforger_t1_1|runeforger_t2_6|runeforger_t2_7|runeforger_t3_11|runeforger_t3_12
+
+[build:b_void_siphon]
+name=Void Siphon
+class=shadowpact
+nodes=shadowpact_t1_1|shadowpact_t2_6|shadowpact_t2_7|shadowpact_t3_11|shadowpact_t3_12|arcana_t1_1|arcana_t2_6|arcana_t2_7|arcana_t3_11|arcana_t3_12
+

@@ -1,0 +1,70 @@
+# Consequence rules (brief 2.5 — single quest-state DB, delayed actions).
+# [rule:id]  on=<trigger>  if=<key==val> (optional)  then=<set:key=val|...>
+# triggers: quest:<qid> (completed), quest_fail:<qid>, act:<n> (act entered), flag:<key> (flag set)
+# All consequences flow from the flag DB — the engine never hardcodes outcomes.
+
+# --- Act 1 looter choice -> Act 4 outcomes (brief 2.5 required example) ---
+[rule:r_looter_freed]
+on=quest:q_act1_looter
+if=act1.looter==freed
+then=set:compact.supply_glass=1|set:ashkar.trust=-1|set:npc.vey_tann_role=compact_captain|set:quest.q_act4_supply.available=1
+
+[rule:r_looter_handed]
+on=quest:q_act1_looter
+if=act1.looter==handed
+then=set:ashkar.trust=2|set:compact.block_maren=1|set:npc.vey_tann_role=ashkar_prisoner
+
+# --- Act 2 Order cell survival -> Act 4 Remnant library (brief 2.5 required example) ---
+[rule:r_cell_saved]
+on=quest:q_act2_cell
+if=act2.cell_saved==1
+then=set:remnant.library=1|set:quest.q_act4_library.available=1
+
+[rule:r_cell_lost]
+on=quest_fail:q_act2_cell
+then=set:remnant.library=0
+
+# --- Cinderhold overrun -> different hub for the whole game (brief 2.5 required example) ---
+[rule:r_cinderhold_fallen]
+on=quest_fail:q_act1_defense
+then=set:region.emberfall.hub=cinderhold_ruins|set:store.price_mul=1.30|set:quest.q_act1_defense.done=1
+
+# --- Sela executes Quill in act 3 unless player intervened ---
+[rule:r_quill_dead]
+on=act:3
+if=act2.cell_saved==1
+then=set:npc.vessel_quill=dead|set:remnant.trust=-2
+
+[rule:r_quill_alive]
+on=act:3
+if=act2.cell_saved==0
+then=set:npc.vessel_quill=alive|set:remnant.trust=2|set:quest.q_act3_quill.available=1
+
+# --- Act 5 board state assembles from all flags (brief 2.3 act 5) ---
+[rule:r_act5_board]
+on=act:5
+then=set:endgame.third_path=0
+
+[rule:r_third_path_ready]
+on=act:5
+if=remnant.library==1
+then=set:endgame.third_path=1
+
+# --- Compact trust from quests feeds store prices (brief 4.7) ---
+[rule:r_compact_trust_magni]
+on=quest:q_side_magni_debt
+then=set:compact.trust=3
+
+[rule:r_compact_trust_blockade_fix]
+on=quest:q_act4_supply
+then=set:compact.block_maren=0|set:compact.trust=2|set:compact.supply_glass=1
+
+# --- Faction wars regardless of player (brief 2.4) ---
+[rule:r_ashkar_choir_feud]
+on=act:2
+then=set:faction.ashkar_vs_choir=war
+
+# --- Grave robber hook (brief 4.8): corpse looted by monsters surfaces later ---
+[rule:r_grave_robber]
+on=death:corpse_looted
+then=set:grave.robber_pending=1

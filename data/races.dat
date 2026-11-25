@@ -1,0 +1,31 @@
+# Races (brief 3.1). resists = element=percent. flags = generic key=value consumed by engine.
+
+[race:ashborn]
+name=Ashborn
+desc=Sundering-marked humans, fire-touched. The ash in their veins shrugs off flame.
+resists=fire=25
+flags=emberfall_rep=1
+
+[race:veilkin]
+name=Veilkin
+desc=Forest-blood. They mend slowly under open sky, and the Veil knows their step.
+resists=nature=15
+flags=veil_map=1|regen_outdoor=1|fire_weak=-15
+
+[race:tideborn]
+name=Tideborn
+desc=Drowned Maren descent. They breathe water and swim like walking.
+resists=water=25
+flags=swim=1|storm_weak=-15
+
+[race:stormcrowned]
+name=Stormcrowned
+desc=Mountain aristocracy. Born to command — and to pay for it everywhere.
+resists=storm=15
+flags=stat_pool_bonus=1|store_mul=1.10
+
+[race:untethered]
+name=Untethered
+desc=No bloodline. Orphans of the Order's secret experiments. Nobody knows what was done to them.
+resists=
+flags=skill_point_bonus=1|no_faction_elite=1

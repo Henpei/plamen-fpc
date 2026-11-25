@@ -1,0 +1,41 @@
+# Regions (brief 2.1). maps = map ids in data/maps/. hub_map = spawn hub.
+
+[region:emberfall]
+name=Emberfall Reach
+biome=ash
+act=1
+desc=Ashen plains and dormant volcanoes, hardest hit by the Sundering. Hub: Cinderhold.
+hub_map=cinderhold
+maps=cinderhold|emberfall_area1|emberfall_area2|emberfall_dungeon
+
+[region:veil]
+name=The Verdant Veil
+biome=forest
+act=2
+desc=An overgrown forest that moves at night. Druid factions, poison beasts, the oldest libraries.
+hub_map=veil_hub
+maps=veil_hub|veil_area1|veil_area2|veil_dungeon
+
+[region:glass]
+name=The Glass Wastes
+biome=glass
+act=3
+desc=A desert fused into glass where the Sundering struck. Mirages show the past.
+hub_map=glass_hub
+maps=glass_hub|glass_area1|glass_area2|glass_dungeon
+
+[region:maren]
+name=Drowned Maren
+biome=water
+act=4
+desc=A sunken coastal kingdom, half under tidal water. Sunken temples, drowned dead.
+hub_map=maren_hub
+maps=maren_hub|maren_area1|maren_area2|maren_dungeon
+
+[region:crown]
+name=The Crown of Storms
+biome=frost
+act=5
+desc=Frozen mountain citadels where the world's rulers sealed themselves away. Endgame.
+hub_map=crown_hub
+maps=crown_hub|crown_area1|crown_area2|crown_dungeon

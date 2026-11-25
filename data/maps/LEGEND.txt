@@ -1,0 +1,10 @@
+# Map legend (chars in grid rows after the header)
+#  #  wall (impassable)          .  floor
+#  ,  floor decor (walkable)     o  rubble (walkable)
+#  T  tree/obstacle (impassable) ^  rock (impassable)
+#  ~  water (impassable unless swim flag)
+#  P  portal (header: portal.<char>)  S  player spawn
+#  M  monster spawn (header: spawn.<n>=monsterid:count:radius)  B  boss spawn (header: boss=<monsterid>)
+#  C  chest (header: chest.<n>=tableid)  L  lore doc (header: lore.<n>=docid)
+#  I  interact marker (header: marker.<id>=label)   G  store (header: store=<storeid>)
+# Header keys: name, region, act, kind(hub|area|dungeon), tileset, w, h

@@ -1,0 +1,269 @@
+# Base items (brief 4.4). stats = stat=value|... applied as flat bonuses.
+# slot in: weapon offhand head body hands legs feet ring amulet
+
+[item:rusted_blade]
+name=Rusted Blade
+slot=weapon
+stats=melee_dmg=2
+icon=weapon
+price=8
+lvl=1
+
+[item:rapier]
+name=Rapier
+slot=weapon
+stats=melee_dmg=5|crit_chance=3
+icon=weapon
+price=30
+lvl=3
+
+[item:ember_staff]
+name=Ember Staff
+slot=weapon
+stats=spell_dmg=6|fire_res=5
+icon=weapon
+price=45
+lvl=4
+twohand=true
+
+[item:rune_hammer]
+name=Rune Hammer
+slot=weapon
+stats=melee_dmg=7|armor=2
+icon=weapon
+price=40
+lvl=4
+
+[item:pact_blade]
+name=Pact Blade
+slot=weapon
+stats=melee_dmg=6|lifesteal=2
+icon=weapon
+price=55
+lvl=5
+
+[item:warhammer]
+name=Warhammer
+slot=weapon
+stats=melee_dmg=9|armor=1
+icon=weapon
+price=60
+lvl=5
+twohand=true
+
+[item:light_wand]
+name=Light Wand
+slot=weapon
+stats=spell_dmg=5|mana_regen=0.5
+icon=weapon
+price=42
+lvl=4
+
+[item:ashbrand]
+name=Ashbrand
+slot=weapon
+stats=melee_dmg=11|element_dmg=6
+icon=weapon
+price=120
+lvl=9
+twohand=true
+
+[item:parry_blade]
+name=Parry Blade
+slot=offhand
+stats=parry=8|block=6
+icon=offhand
+price=35
+lvl=4
+
+[item:bulwark]
+name=Bulwark
+slot=offhand
+stats=block=14|armor=6|max_hp=10
+icon=offhand
+price=70
+lvl=6
+
+[item:ash_tome]
+name=Ash Tome
+slot=offhand
+stats=spell_dmg=8|max_mana=8
+icon=offhand
+price=65
+lvl=6
+
+[item:warden_helm]
+name=Warden Helm
+slot=head
+stats=armor=5|max_hp=12|block=5
+icon=head
+price=55
+lvl=6
+
+[item:ash_hood]
+name=Ash Hood
+slot=head
+stats=fire_res=12|spell_dmg=4
+icon=head
+price=38
+lvl=4
+
+[item:veil_mask]
+name=Veil Mask
+slot=head
+stats=nature_res=12|dodge_chance=4
+icon=head
+price=48
+lvl=5
+
+[item:duelist_leather]
+name=Duelist Leather
+slot=body
+stats=armor=4|dodge_chance=5|move_speed=0.2
+icon=body
+price=45
+lvl=4
+
+[item:ash_robe]
+name=Ash Robe
+slot=body
+stats=fire_res=10|spell_dmg=6|max_mana=10
+icon=body
+price=50
+lvl=5
+
+[item:forger_apron]
+name=Forger Apron
+slot=body
+stats=armor=6|max_stamina=12|magic_find=10
+icon=body
+price=52
+lvl=5
+
+[item:pact_vestments]
+name=Pact Vestments
+slot=body
+stats=lifesteal=3|max_mana=14|void_res=8
+icon=body
+price=62
+lvl=6
+
+[item:vanguard_plate]
+name=Vanguard Plate
+slot=body
+stats=armor=12|max_hp=24|block=8
+icon=body
+price=85
+lvl=8
+
+[item:binder_robes]
+name=Binder Robes
+slot=body
+stats=max_mana=16|mana_regen=0.8|spirit=2
+icon=body
+price=58
+lvl=6
+
+[item:miner_gloves]
+name=Miner Gloves
+slot=hands
+stats=might=2|armor=2
+icon=hands
+price=18
+lvl=2
+
+[item:ash_gauntlets]
+name=Ash Gauntlets
+slot=hands
+stats=melee_dmg=4|fire_res=8
+icon=hands
+price=40
+lvl=5
+
+[item:swift_gloves]
+name=Swift Gloves
+slot=hands
+stats=grace=2|attack_speed=0.08
+icon=hands
+price=44
+lvl=5
+
+[item:tread_boots]
+name=Tread Boots
+slot=feet
+stats=move_speed=0.25|armor=2
+icon=feet
+price=25
+lvl=3
+
+[item:storm_boots]
+name=Storm Boots
+slot=feet
+stats=storm_res=10|move_speed=0.2
+icon=feet
+price=50
+lvl=6
+
+[item:rune_ring]
+name=Rune Ring
+slot=ring
+stats=spirit=2|spell_dmg=3
+icon=ring
+price=48
+lvl=5
+
+[item:cinder_charm]
+name=Cinder Charm
+slot=amulet
+stats=fire_res=10|element_dmg=5
+icon=amulet
+price=46
+lvl=5
+
+[item:hunger_icon]
+name=Hunger Icon
+slot=amulet
+stats=lifesteal=3|void_res=10
+icon=amulet
+price=58
+lvl=6
+
+[item:dawn_shard]
+name=Dawn Shard
+slot=amulet
+stats=max_mana=10|mana_regen=0.6|spirit=2
+icon=amulet
+price=56
+lvl=6
+
+[item:travel_pack]
+name=Travel Pack
+slot=body
+stats=carry=15
+icon=body
+price=20
+lvl=1
+
+[item:health_vial]
+name=Health Vial
+slot=offhand
+stats=
+icon=potion
+price=15
+lvl=1
+
+[item:mana_vial]
+name=Mana Vial
+slot=offhand
+stats=
+icon=potion
+price=15
+lvl=1
+
+[item:tideborn_gear]
+name=Tideborn Waverider
+slot=body
+stats=water_res=18|move_speed=0.3|swim=1
+icon=body
+price=90
+lvl=7

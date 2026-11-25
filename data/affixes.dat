@@ -1,0 +1,213 @@
+# Affixes (brief 4.4). [affix:id] stat must exist in stats.dat (validated at load).
+# [pool:N] = rarity N (0..5) affix pool; refs are affixId:weight. Roll value = min + rnd*(max-min), scaled by item level.
+
+[affix:of_might]
+name=of Might
+stat=might
+min=1
+max=4
+
+[affix:of_wits]
+name=of Wits
+stat=wits
+min=1
+max=4
+
+[affix:of_grace]
+name=of Grace
+stat=grace
+min=1
+max=4
+
+[affix:of_spirit]
+name=of Spirit
+stat=spirit
+min=1
+max=4
+
+[affix:of_resolve]
+name=of Resolve
+stat=resolve
+min=1
+max=4
+
+[affix:of_vigor]
+name=of Vigor
+stat=max_hp
+min=6
+max=20
+
+[affix:of_mana]
+name=of Mana
+stat=max_mana
+min=5
+max=16
+
+[affix:of_breath]
+name=of Breath
+stat=max_stamina
+min=6
+max=18
+
+[affix:of_the_axe]
+name=of the Axe
+stat=melee_dmg
+min=2
+max=7
+
+[affix:of_the_flame]
+name=of the Flame
+stat=spell_dmg
+min=2
+max=7
+
+[affix:of_the_crit]
+name=of the Crit
+stat=crit_chance
+min=2
+max=6
+
+[affix:of_sharpening]
+name=of Sharpening
+stat=crit_dmg
+min=10
+max=30
+
+[affix:of_the_cheetah]
+name=of the Cheetah
+stat=move_speed
+min=0.15
+max=0.45
+
+[affix:of_swift_hands]
+name=of Swift Hands
+stat=attack_speed
+min=0.05
+max=0.18
+
+[affix:of_the_wall]
+name=of the Wall
+stat=armor
+min=2
+max=8
+
+[affix:of_blocking]
+name=of Blocking
+stat=block
+min=4
+max=12
+
+[affix:of_the_phoenix]
+name=of the Phoenix
+stat=fire_res
+min=8
+max=22
+
+[affix:of_the_river]
+name=of the River
+stat=water_res
+min=8
+max=22
+
+[affix:of_the_thicket]
+name=of the Thicket
+stat=nature_res
+min=8
+max=22
+
+[affix:of_the_storm]
+name=of the Storm
+stat=storm_res
+min=8
+max=22
+
+[affix:of_the_abyss]
+name=of the Abyss
+stat=void_res
+min=8
+max=22
+
+[affix:of_the_pantheon]
+name=of the Pantheon
+stat=all_res
+min=3
+max=8
+
+[affix:of_the_leech]
+name=of the Leech
+stat=lifesteal
+min=1.5
+max=5
+
+[affix:of_the_cactus]
+name=of the Cactus
+stat=thorns
+min=3
+max=10
+
+[affix:of_the_duelist]
+name=of the Duelist
+stat=parry
+min=4
+max=12
+
+[affix:of_the_gambler]
+name=of the Gambler
+stat=dodge_chance
+min=3
+max=9
+
+[affix:of_the_scholar]
+name=of the Scholar
+stat=xp_gain
+min=5
+max=15
+
+[affix:of_the_miser]
+name=of the Miser
+stat=gold_find
+min=8
+max=25
+
+[affix:of_the_omens]
+name=of Omens
+stat=magic_find
+min=10
+max=30
+
+[affix:of_embers]
+name=of Embers
+stat=element_dmg
+min=4
+max=12
+
+[affix:of_battle]
+name=of Battle
+stat=melee_dmg_pct
+min=4
+max=12
+
+[affix:of_regeneration]
+name=of Regeneration
+stat=hp_regen
+min=0.4
+max=1.4
+
+# ---- pools per rarity (0=Grå .. 5=Mythforged); count rolled = RARITY_AFFIX_COUNT ----
+[pool:0]
+affixes=
+
+[pool:1]
+affixes=of_might:10|of_wits:10|of_grace:10|of_spirit:10|of_resolve:10|of_vigor:8|of_breath:6|of_the_axe:8|of_the_phoenix:4|of_the_river:4|of_the_thicket:4|of_the_storm:4|of_the_abyss:4
+
+[pool:2]
+affixes=of_might:10|of_wits:10|of_grace:10|of_spirit:10|of_resolve:10|of_vigor:10|of_mana:8|of_breath:8|of_the_axe:10|of_the_flame:10|of_the_crit:6|of_the_wall:6|of_blocking:5|of_the_phoenix:6|of_the_river:6|of_the_thicket:6|of_the_storm:6|of_the_abyss:6|of_the_leech:4|of_the_scholar:3|of_the_miser:3|of_embers:5|of_battle:5
+
+[pool:3]
+affixes=of_might:9|of_wits:9|of_grace:9|of_spirit:9|of_resolve:9|of_vigor:10|of_mana:9|of_breath:8|of_the_axe:9|of_the_flame:9|of_the_crit:8|of_sharpening:6|of_the_cheetah:6|of_swift_hands:6|of_the_wall:7|of_blocking:6|of_the_pantheon:5|of_the_leech:6|of_the_cactus:4|of_the_duelist:5|of_the_gambler:4|of_the_scholar:5|of_the_miser:5|of_the_omens:4|of_embers:7|of_battle:7|of_regeneration:4
+
+[pool:4]
+affixes=of_might:8|of_wits:8|of_grace:8|of_spirit:8|of_resolve:8|of_vigor:9|of_mana:8|of_breath:7|of_the_axe:8|of_the_flame:8|of_the_crit:8|of_sharpening:8|of_the_cheetah:7|of_swift_hands:7|of_the_wall:8|of_blocking:7|of_the_pantheon:7|of_the_leech:7|of_the_cactus:5|of_the_duelist:6|of_the_gambler:5|of_the_scholar:6|of_the_miser:6|of_the_omens:7|of_embers:8|of_battle:8|of_regeneration:5
+
+[pool:5]
+affixes=of_might:6|of_wits:6|of_grace:6|of_spirit:6|of_resolve:6|of_vigor:8|of_mana:8|of_the_axe:7|of_the_flame:7|of_the_crit:7|of_sharpening:8|of_the_cheetah:6|of_swift_hands:6|of_the_wall:7|of_blocking:6|of_the_pantheon:8|of_the_leech:8|of_the_duelist:6|of_the_gambler:5|of_the_scholar:6|of_the_miser:6|of_the_omens:8|of_embers:8|of_battle:8|of_regeneration:6

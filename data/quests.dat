@@ -1,0 +1,249 @@
+# Quests (brief 4.10). objectives = kind:target[:count]; kind in kill|talk|reach|collect|interact
+# requires = 'key==val' list (all must hold to be offered). fail_if = 'key==val' (quest fails when true).
+# on_complete = set:key=val list. unlocks = quest ids. Rewards: reward_xp, reward_gold, reward_items.
+
+# ================= ACT 1 — Ember and Ash =================
+[quest:q_act1_1]
+title=Ashes of the Purge
+act=1
+giver=sela_vosch
+region=emberfall
+desc=Sela Vosch wants survivors with spine. Survive the talk, at least.
+objectives=talk:sela_vosch:1
+requires=
+reward_xp=40
+reward_gold=15
+reward_items=health_vial
+on_complete=set:act1.started=1
+unlocks=q_act1_2|q_act1_looter
+
+[quest:q_act1_2]
+title=Why They Organize
+act=1
+giver=sela_vosch
+region=emberfall
+desc=War-banner cultists drill in emberfall_area1. Bring proof of the Order's mark.
+objectives=kill:banner_cultist:1|collect:orders_badge:1
+requires=quest.q_act1_1.completed==1
+reward_xp=120
+reward_gold=40
+reward_items=mana_vial
+on_complete=set:act1.sigil_found=1
+unlocks=q_act1_3|q_act1_defense
+
+[quest:q_act1_looter]
+title=The Looter of Cinderhold
+act=1
+giver=vey_tann
+region=emberfall
+desc=Vey Tann hangs on an Ashkar rope. Hand him over — or cut him free. The choice is remembered in act 4.
+objectives=interact:vey_tann:1
+requires=quest.q_act1_1.completed==1
+reward_xp=60
+reward_gold=0
+reward_items=
+on_complete=set:act1.looter_decided=1
+unlocks=
+
+[quest:q_act1_defense]
+title=Hold the Walls
+act=1
+giver=haggar_moss
+region=emberfall
+desc=If Cinderhold falls, the whole game changes hub. Defend the gate marker.
+objectives=interact:gate_wall:1|kill:ash_brute:2
+requires=quest.q_act1_2.completed==1
+fail_if=region.emberfall.overrun==1
+reward_xp=150
+reward_gold=60
+reward_items=vanguard_plate
+on_complete=set:act1.cinderhold_safe=1
+unlocks=
+
+[quest:q_act1_3]
+title=The Charred Maw
+act=1
+giver=sela_vosch
+region=emberfall
+desc=The dungeon under Emberfall festers with something big. Kill the Charred Maw.
+objectives=reach:emberfall_dungeon:1|kill:charred_maw:1
+requires=quest.q_act1_2.completed==1
+reward_xp=300
+reward_gold=120
+reward_items=u:mawfang_blade
+on_complete=set:act1.boss_down=1|set:act=2
+unlocks=q_act2_1
+
+# ================= ACT 2 — The Hunt for the Order =================
+[quest:q_act2_1]
+title=Cells in the Veil
+act=2
+giver=sela_vosch
+region=veil
+desc=Hunt Order cells across the Veil. The forest moves at night — watch the trees.
+objectives=reach:veil_area1:1|kill:library_husk:1
+requires=act==2
+reward_xp=250
+reward_gold=80
+reward_items=u:library_key
+on_complete=set:act2.husk_down=1
+unlocks=q_act2_cell
+
+[quest:q_act2_cell]
+title=The Cell in Maren
+act=2
+giver=vessel_quill
+region=maren
+desc=An Order cell is under siege in maren_area1. Save them — or don't. The Remnant library in act 4 depends on it.
+objectives=reach:maren_area1:1|kill:drowned_knight:3|talk:vessel_quill:1
+requires=act==2
+fail_if=act2.cell_overrun==1
+reward_xp=300
+reward_gold=100
+reward_items=u:remnant_signet
+on_complete=set:act2.cell_saved=1
+unlocks=q_act3_1
+
+# ================= ACT 3 — The Veil Libraries =================
+[quest:q_act3_1]
+title=What the Stones Say
+act=3
+giver=ithra
+region=veil
+desc=Piece together the Flameheart truth from the Veil libraries. Read the contradicting documents.
+objectives=talk:ithra:1|collect:lore_veil_1:1|collect:lore_veil_2:1
+requires=act==3
+reward_xp=350
+reward_gold=90
+reward_items=u:ithras_lens
+on_complete=set:act3.revealed=1|set:act=4
+unlocks=q_act4_1
+
+# ================= ACT 4 — The False Enemy =================
+[quest:q_act4_1]
+title=Sela's Secret
+act=4
+giver=sela_vosch
+region=maren
+desc=Confront Sela. She is ex-Order — and she has the means for a second Sundering.
+objectives=talk:sela_vosch:1|reach:maren_dungeon:1|kill:leviathan_shade:1
+requires=act==4
+reward_xp=500
+reward_gold=200
+reward_items=u:sundering_shard
+on_complete=set:act4.sela_confronted=1|set:act=5
+unlocks=q_act4_supply|q_act4_library
+
+[quest:q_act4_supply]
+title=Glass Wastes Supply Line
+act=4
+giver=wrong_magni
+region=glass
+desc=Only available if the looter you freed in act 1 is alive as a Compact captain. Opens cheap Glass Wastes stores.
+objectives=talk:wrong_magni:1
+requires=act==4|quest.q_act4_supply.available==1
+reward_xp=200
+reward_gold=150
+reward_items=
+on_complete=set:compact.supply_glass=1|set:compact.block_maren=0
+unlocks=
+
+[quest:q_act4_library]
+title=The Remnant Library
+act=4
+giver=vessel_quill
+region=maren
+desc=Only exists if the act-2 Order cell survived. Its documents are required for the third path.
+objectives=reach:maren_dungeon:1|collect:lore_remnant_1:1|collect:lore_remnant_2:1
+requires=act==4|quest.q_act4_library.available==1|remnant.library==1
+reward_xp=400
+reward_gold=0
+reward_items=u:verbatim_of_the_sundering
+on_complete=set:endgame.third_path_docs=1
+unlocks=
+
+# ================= ACT 5 — The Choice =================
+[quest:q_act5_choice]
+title=The Choice
+act=5
+giver=unlit_whisper
+region=crown
+desc=The Unlit half-wakes. Commit: second Sundering (Sela), full waking (the Unlit), or the third path (needs remnant.library==1 and endgame.third_path_docs==1).
+objectives=reach:crown_dungeon:1|kill:crown_warden:1|interact:flameheart:1
+requires=act==5
+reward_xp=1000
+reward_gold=500
+reward_items=
+on_complete=set:endgame.done=1
+unlocks=
+
+# ================= hand-authored side quests =================
+[quest:q_side_magni_debt]
+title=Magni's Little Debts
+act=1
+giver=wrong_magni
+region=emberfall
+desc=Wrong Magni needs three Ashkar debtors "encouraged" in emberfall_area2. Nobody dies. Probably.
+objectives=kill:ember_hound:4|talk:wrong_magni:1
+requires=act==1
+reward_xp=90
+reward_gold=70
+reward_items=health_vial
+on_complete=set:compact.trust=3
+unlocks=
+
+[quest:q_side_dagny_heirlooms]
+title=Heirlooms of the Fallen
+act=1
+giver=dagny
+region=emberfall
+desc=Dagny needs proof that the grave-robbers are stripping Cinderhold's dead. Kill 3 sulfur spiders near the graves.
+objectives=kill:sulfur_spider:3
+requires=act==1
+reward_xp=70
+reward_gold=30
+reward_items=u:grave_ring
+on_complete=set:dagny.trust=1
+unlocks=
+
+[quest:q_side_haggar_libraries]
+title=The Farmer Who Burns Libraries
+act=1
+giver=haggar_moss
+region=emberfall
+desc=Haggar wants the old shrine in emberfall_area2 desecrated. The Choir will hear of this.
+objectives=interact:shrine_ember:1
+requires=act==1
+reward_xp=60
+reward_gold=25
+reward_items=
+on_complete=set:choir.trust=-2|set:ashkar.trust=1
+unlocks=
+
+[quest:q_side_ithra_contradiction]
+title=Two Stones, One Lie
+act=2
+giver=ithra
+region=veil
+desc=Ithra needs the runestone pair in veil_area2 read and compared. One of them lies.
+objectives=interact:runestone_a:1|interact:runestone_b:1
+requires=act==2
+reward_xp=110
+reward_gold=40
+reward_items=u:ithras_lens
+on_complete=set:lore.contradiction_found=1
+unlocks=
+
+[quest:q_side_quill_spells]
+title=A Remnant Mage's Prices
+act=2
+giver=vessel_quill
+region=maren
+desc=Vessel Quill will sell you forbidden spells if you clear leeches from the air-pocket delve.
+objectives=kill:tide_leech:5
+requires=act==2|npc.vessel_quill==alive
+reward_xp=130
+reward_gold=0
+reward_items=mana_vial
+on_complete=set:remnant.trust=1
+unlocks=

@@ -2,3 +2,122 @@
 2026-11-25 02:20:24 PLAMEN boot commit=08eaa68 built=2026-11-25T01:20:24Z
 2026-11-25 02:20:26 PLAMEN exit ok
 2026-11-25 02:20:49 PLAMEN boot commit=08eaa68 built=2026-11-25T01:20:49Z
+2026-11-25 02:36:05 PLAMEN boot commit=4ca98a0 built=2026-11-25T01:36:04Z
+2026-11-25 02:36:05 FATAL: affixes.dat [affix:of_might]: unknown stat might
+2026-11-25 02:36:08 PLAMEN boot commit=4ca98a0 built=2026-11-25T01:36:08Z
+2026-11-25 02:36:08 FATAL: drops.dat [table:t_brute] bad entry: u:mawhammer:0.02:8:30:1
+2026-11-25 02:36:31 PLAMEN boot commit=4ca98a0 built=2026-11-25T01:36:30Z
+2026-11-25 02:36:31 data loaded: 31 stats, 6 elements, 5 races, 6 classes, 199 skills, 36 spells, 21 monsters, 32 affixes, 6 pools, 33 items, 52 uniques, 16 tables, 10 npcs, 47 quests, 14 rules, 26 lore, 5 stores, 5 regions, 12 builds
+2026-11-25 02:36:31 LEVEL UP: XPTest reached level 2
+2026-11-25 02:36:31 LEVEL UP: XPTest reached level 3
+2026-11-25 02:36:31 LEVEL UP: XPTest reached level 4
+2026-11-25 02:36:31 LEVEL UP: XPTest reached level 5
+2026-11-25 02:36:31 QUEST COMPLETE: Ashes of the Purge
+2026-11-25 02:36:31 LEVEL UP: QuestTest reached level 2
+2026-11-25 02:36:31 FATAL: quest q_act2_cell reward: unknown item u:remnant_signet
+2026-11-25 02:36:43 PLAMEN boot commit=4ca98a0 built=2026-11-25T01:36:30Z
+2026-11-25 02:36:43 data loaded: 31 stats, 6 elements, 5 races, 6 classes, 199 skills, 36 spells, 21 monsters, 32 affixes, 6 pools, 33 items, 52 uniques, 16 tables, 10 npcs, 47 quests, 13 rules, 26 lore, 5 stores, 5 regions, 12 builds
+2026-11-25 02:36:43 LEVEL UP: XPTest reached level 2
+2026-11-25 02:36:43 LEVEL UP: XPTest reached level 3
+2026-11-25 02:36:43 LEVEL UP: XPTest reached level 4
+2026-11-25 02:36:43 LEVEL UP: XPTest reached level 5
+2026-11-25 02:36:43 QUEST COMPLETE: Ashes of the Purge
+2026-11-25 02:36:43 LEVEL UP: QuestTest reached level 2
+2026-11-25 02:36:43 FATAL: quest q_act2_cell reward: unknown item u:remnant_signet
+2026-11-25 02:36:46 PLAMEN boot commit=4ca98a0 built=2026-11-25T01:36:46Z
+2026-11-25 02:36:46 data loaded: 31 stats, 6 elements, 5 races, 6 classes, 199 skills, 36 spells, 21 monsters, 32 affixes, 6 pools, 33 items, 52 uniques, 16 tables, 10 npcs, 47 quests, 13 rules, 26 lore, 5 stores, 5 regions, 12 builds
+2026-11-25 02:36:46 LEVEL UP: XPTest reached level 2
+2026-11-25 02:36:46 LEVEL UP: XPTest reached level 3
+2026-11-25 02:36:46 LEVEL UP: XPTest reached level 4
+2026-11-25 02:36:46 LEVEL UP: XPTest reached level 5
+2026-11-25 02:36:46 QUEST COMPLETE: Ashes of the Purge
+2026-11-25 02:36:46 QUEST COMPLETE: The Looter of Cinderhold
+2026-11-25 02:36:46 LEVEL UP: QuestTest reached level 2
+2026-11-25 02:36:46 QUEST COMPLETE: The Cell in Maren
+2026-11-25 02:36:46 QUEST FAILED: Hold the Walls
+2026-11-25 02:36:46 LEVEL UP: SaveTest reached level 2
+2026-11-25 02:36:46 LEVEL UP: SaveTest reached level 3
+2026-11-25 02:36:46 QUEST COMPLETE: Ashes of the Purge
+2026-11-25 02:37:08 PLAMEN boot commit=4ca98a0 built=2026-11-25T01:37:08Z
+2026-11-25 02:37:08 data loaded: 31 stats, 6 elements, 5 races, 6 classes, 199 skills, 36 spells, 21 monsters, 32 affixes, 6 pools, 33 items, 52 uniques, 16 tables, 10 npcs, 47 quests, 13 rules, 26 lore, 5 stores, 5 regions, 12 builds
+2026-11-25 02:37:08 LEVEL UP: XPTest reached level 2
+2026-11-25 02:37:08 LEVEL UP: XPTest reached level 3
+2026-11-25 02:37:08 LEVEL UP: XPTest reached level 4
+2026-11-25 02:37:08 LEVEL UP: XPTest reached level 5
+2026-11-25 02:37:08 QUEST COMPLETE: Ashes of the Purge
+2026-11-25 02:37:08 QUEST COMPLETE: The Looter of Cinderhold
+2026-11-25 02:37:08 LEVEL UP: QuestTest reached level 2
+2026-11-25 02:37:08 QUEST COMPLETE: The Cell in Maren
+2026-11-25 02:37:08 QUEST COMPLETE: Ashes of the Purge
+2026-11-25 02:37:08 QUEST COMPLETE: The Looter of Cinderhold
+2026-11-25 02:37:08 QUEST FAILED: Hold the Walls
+2026-11-25 02:37:08 LEVEL UP: SaveTest reached level 2
+2026-11-25 02:37:08 LEVEL UP: SaveTest reached level 3
+2026-11-25 02:37:08 QUEST COMPLETE: Ashes of the Purge
+2026-11-25 02:37:16 data loaded: 31 stats, 6 elements, 5 races, 6 classes, 199 skills, 36 spells, 21 monsters, 32 affixes, 6 pools, 33 items, 52 uniques, 16 tables, 10 npcs, 47 quests, 13 rules, 26 lore, 5 stores, 5 regions, 12 builds
+2026-11-25 02:37:41 PLAMEN boot commit=4ca98a0 built=2026-11-25T01:37:33Z
+2026-11-25 02:37:41 data loaded: 31 stats, 6 elements, 5 races, 6 classes, 199 skills, 36 spells, 21 monsters, 32 affixes, 6 pools, 33 items, 52 uniques, 16 tables, 10 npcs, 47 quests, 13 rules, 26 lore, 5 stores, 5 regions, 12 builds
+2026-11-25 02:37:41 LEVEL UP: XPTest reached level 2
+2026-11-25 02:37:41 LEVEL UP: XPTest reached level 3
+2026-11-25 02:37:41 LEVEL UP: XPTest reached level 4
+2026-11-25 02:37:41 LEVEL UP: XPTest reached level 5
+2026-11-25 02:37:41 QUEST COMPLETE: Ashes of the Purge
+2026-11-25 02:37:41 QUEST COMPLETE: The Looter of Cinderhold
+2026-11-25 02:37:41 LEVEL UP: QuestTest reached level 2
+2026-11-25 02:37:41 QUEST COMPLETE: The Cell in Maren
+2026-11-25 02:37:41 QUEST COMPLETE: Ashes of the Purge
+2026-11-25 02:37:41 QUEST COMPLETE: The Looter of Cinderhold
+2026-11-25 02:37:41 QUEST FAILED: Hold the Walls
+2026-11-25 02:37:41 LEVEL UP: SaveTest reached level 2
+2026-11-25 02:37:41 LEVEL UP: SaveTest reached level 3
+2026-11-25 02:37:41 QUEST COMPLETE: Ashes of the Purge
+2026-11-25 02:37:49 data loaded: 31 stats, 6 elements, 5 races, 6 classes, 199 skills, 36 spells, 21 monsters, 32 affixes, 6 pools, 33 items, 52 uniques, 16 tables, 10 npcs, 47 quests, 13 rules, 26 lore, 5 stores, 5 regions, 12 builds
+2026-11-25 02:37:57 data loaded: 31 stats, 6 elements, 5 races, 6 classes, 199 skills, 36 spells, 21 monsters, 32 affixes, 6 pools, 33 items, 52 uniques, 16 tables, 10 npcs, 47 quests, 13 rules, 26 lore, 5 stores, 5 regions, 12 builds
+2026-11-25 02:37:57 PLAMEN boot commit=4ca98a0 built=2026-11-25T01:37:56Z
+2026-11-25 02:37:57 data loaded: 31 stats, 6 elements, 5 races, 6 classes, 199 skills, 36 spells, 21 monsters, 32 affixes, 6 pools, 33 items, 52 uniques, 16 tables, 10 npcs, 47 quests, 13 rules, 26 lore, 5 stores, 5 regions, 12 builds
+2026-11-25 02:37:57 LEVEL UP: XPTest reached level 2
+2026-11-25 02:37:57 LEVEL UP: XPTest reached level 3
+2026-11-25 02:37:57 LEVEL UP: XPTest reached level 4
+2026-11-25 02:37:57 LEVEL UP: XPTest reached level 5
+2026-11-25 02:37:57 QUEST COMPLETE: Ashes of the Purge
+2026-11-25 02:37:57 QUEST COMPLETE: The Looter of Cinderhold
+2026-11-25 02:37:57 LEVEL UP: QuestTest reached level 2
+2026-11-25 02:37:57 QUEST COMPLETE: The Cell in Maren
+2026-11-25 02:37:57 QUEST COMPLETE: Ashes of the Purge
+2026-11-25 02:37:57 QUEST COMPLETE: The Looter of Cinderhold
+2026-11-25 02:37:57 QUEST FAILED: Hold the Walls
+2026-11-25 02:37:57 LEVEL UP: SaveTest reached level 2
+2026-11-25 02:37:57 LEVEL UP: SaveTest reached level 3
+2026-11-25 02:37:57 QUEST COMPLETE: Ashes of the Purge
+2026-11-25 02:38:15 PLAMEN boot commit=4ca98a0 built=2026-11-25T01:38:15Z
+2026-11-25 02:38:15 data loaded: 31 stats, 6 elements, 5 races, 6 classes, 199 skills, 36 spells, 21 monsters, 32 affixes, 6 pools, 33 items, 52 uniques, 16 tables, 10 npcs, 47 quests, 13 rules, 26 lore, 5 stores, 5 regions, 12 builds
+2026-11-25 02:38:15 LEVEL UP: XPTest reached level 2
+2026-11-25 02:38:15 LEVEL UP: XPTest reached level 3
+2026-11-25 02:38:15 LEVEL UP: XPTest reached level 4
+2026-11-25 02:38:15 LEVEL UP: XPTest reached level 5
+2026-11-25 02:38:15 QUEST COMPLETE: Ashes of the Purge
+2026-11-25 02:38:15 QUEST COMPLETE: The Looter of Cinderhold
+2026-11-25 02:38:15 LEVEL UP: QuestTest reached level 2
+2026-11-25 02:38:15 QUEST COMPLETE: The Cell in Maren
+2026-11-25 02:38:15 QUEST COMPLETE: Ashes of the Purge
+2026-11-25 02:38:15 QUEST COMPLETE: The Looter of Cinderhold
+2026-11-25 02:38:15 QUEST FAILED: Hold the Walls
+2026-11-25 02:38:15 LEVEL UP: SaveTest reached level 2
+2026-11-25 02:38:15 LEVEL UP: SaveTest reached level 3
+2026-11-25 02:38:15 QUEST COMPLETE: Ashes of the Purge
+2026-11-25 02:38:28 PLAMEN boot commit=4ca98a0 built=2026-11-25T01:38:15Z
+2026-11-25 02:38:28 data loaded: 31 stats, 6 elements, 5 races, 6 classes, 199 skills, 36 spells, 21 monsters, 32 affixes, 6 pools, 33 items, 52 uniques, 16 tables, 10 npcs, 47 quests, 13 rules, 26 lore, 5 stores, 5 regions, 12 builds
+2026-11-25 02:38:28 LEVEL UP: XPTest reached level 2
+2026-11-25 02:38:28 LEVEL UP: XPTest reached level 3
+2026-11-25 02:38:28 LEVEL UP: XPTest reached level 4
+2026-11-25 02:38:28 LEVEL UP: XPTest reached level 5
+2026-11-25 02:38:28 QUEST COMPLETE: Ashes of the Purge
+2026-11-25 02:38:28 QUEST COMPLETE: The Looter of Cinderhold
+2026-11-25 02:38:28 LEVEL UP: QuestTest reached level 2
+2026-11-25 02:38:28 QUEST COMPLETE: The Cell in Maren
+2026-11-25 02:38:28 QUEST COMPLETE: Ashes of the Purge
+2026-11-25 02:38:28 QUEST COMPLETE: The Looter of Cinderhold
+2026-11-25 02:38:28 QUEST FAILED: Hold the Walls
+2026-11-25 02:38:28 LEVEL UP: SaveTest reached level 2
+2026-11-25 02:38:28 LEVEL UP: SaveTest reached level 3
+2026-11-25 02:38:28 QUEST COMPLETE: Ashes of the Purge

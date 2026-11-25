@@ -1,0 +1,91 @@
+# NPCs (brief 2.6). map/x/y = placement on a map (map empty = not placed / appears via flags).
+
+[npc:sela_vosch]
+name=Warden Sela Vosch
+title=of the Vigil
+faction=vigil
+map=cinderhold
+x=14
+y=12
+essential=true
+
+[npc:haggar_moss]
+name=Haggar Moss
+title=of the Ashkar Freehold
+faction=ashkar
+map=cinderhold
+x=20
+y=18
+essential=true
+
+[npc:dagny]
+name=Bone-Carver Dagny
+title=mortician of Cinderhold
+faction=choir
+map=cinderhold
+x=8
+y=20
+essential=true
+
+[npc:wrong_magni]
+name=Wrong Magni
+title=Compact caravan master
+faction=compact
+map=cinderhold
+x=26
+y=10
+essential=true
+
+[npc:vey_tann]
+name=Vey Tann
+title=captured looter
+faction=
+map=cinderhold
+x=11
+y=24
+essential=true
+
+[npc:ithra]
+name=Lorekeeper Ithra
+title=librarian of the Veil
+faction=choir
+map=veil_hub
+x=12
+y=10
+essential=true
+
+[npc:vessel_quill]
+name=Vessel Quill
+title=escaped Remnant mage
+faction=remnant
+map=maren_area1
+x=18
+y=14
+essential=false
+
+[npc:choir_druid]
+name=Thorncaller Mire
+title=of the Verdant Choir
+faction=choir
+map=veil_area1
+x=22
+y=16
+essential=true
+
+[npc:compact_factor]
+name=Factor Bloat
+title=of the Gilded Compact
+faction=compact
+map=maren_hub
+x=15
+y=12
+essential=true
+
+[npc:unlit_whisper]
+name=The Unlit's Whisper
+title=a voice in your head
+faction=
+map=
+x=-1
+y=-1
+essential=true

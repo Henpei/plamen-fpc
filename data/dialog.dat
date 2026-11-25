@@ -1,0 +1,103 @@
+# Dialog lines. Section [dialog:<npc>:<sec>]. Each line value:
+#   <cond>|<text>|<choices>
+# cond: '' or 'key==val' (line skipped if false). choices: comma-separated
+#   Label=>action;action   action: goto:sec | set:key=val | quest:qid | end
+
+[dialog:sela:start]
+line=||Warden Sela Vosch. You survived the purge — few do. The Vigil is recruiting survivors with spine.|Tell me about the surge.|goto:sela_surge
+line=act1.sigil_found==1|That sigil on the war-banner... the Order is extinct, boy. Someone is lying, and I intend to find out who.|goto:sela_end
+line=||The monsters have organized, {PLAYER}. War-banners, drilled formations. That is not animal behavior.|Where do we start?|goto:sela_quest
+line=||Emberfall_area1, south of here. Bring me proof — a banner, a badge, anything with the Order's mark.|Understood.|goto:sela_end|quest:q_act1_2
+line=||And {PLAYER} — if you find one of their prisoners... the Ashkar want looters hanged. I say we decide our own justice. Choose well.|goto:sela_end
+
+[dialog:sela:surge]
+line=||Organized monsters mean a handler. Someone is feeding them, arming them. Six hundred years the Order has been dust — and suddenly their sigil waves over Emberfall.|The Order?|goto:sela_order
+line=||Sela's eyes flick to the sigil on her own blade — then away.|goto:sela_end
+
+[dialog:sela:order]
+line=||The Ascendant Order monopolized magic until the Sundering broke them. Officially extinct. Officially.|And unofficially?|goto:sela_lie
+
+[dialog:sela:lie]
+line=act3.revealed==1|...You know already. Then you know what I must do. The Unlit stirs beneath the Crown, and every mage is a channel for its waking. A second Sundering, while it is still weak — that is the only way to burn it out.|goto:sela_end
+line=||Unofficially, dead men don't wave banners. But if they did — I'd hunt them. That's the job.|goto:sela_end
+
+[dialog:sela:quest]
+line=||South, in emberfall_area1. The war-banner cultists carry Order badges. Get me one.|goto:sela_end|quest:q_act1_2
+
+[dialog:sela:end]
+line=|||End=>end
+
+[dialog:haggar:start]
+line=ashkar.trust==2|The Freehold stands with you, {PLAYER}. Looters hang in Cinderhold — that's the law we wrote.|goto:haggar_end
+line=||Haggar Moss. Ashkar Freehold. We burned the mage-towers when the Order fell; we'll burn them again if magic comes back.|What do you want?|goto:haggar_want
+
+[dialog:haggar:want]
+line=||Mages are why the Sundering happened. Every spell you cast feeds whatever sleeps under the Crown. Libraries too — burn the lies.|goto:haggar_end
+
+[dialog:haggar:end]
+line=|||End=>end
+
+[dialog:vey_tann:start]
+line=||Vey Tann, bound in Ashkar chains. "They caught me lifting a Compact strongbox. Hang me or free me — your call, hero."|Hand him to the Ashkar.|goto:vey_hand|set:act1.looter=handed|quest:q_act1_looter
+line=||Vey Tann, bound in Ashkar chains. "They caught me lifting a Compact strongbox. Hang me or free me — your call, hero."|Free him.|goto:vey_free|set:act1.looter=freed|quest:q_act1_looter
+
+[dialog:vey_tann:hand]
+line=||The Ashkar nod. "The law is the law." Vey is dragged off. He grins at you anyway. "Remember this when the Compact strangles Maren, hero."|goto:vey_done
+
+[dialog:vey_tann:free]
+line=||You cut the ropes. Vey Tann laughs, pockets his lockpicks, and is gone before you can blink. "Someday, hero. Someday I repay."|goto:vey_done
+
+[dialog:vey_tann:done]
+line=|||End=>end
+
+[dialog:dagny:start]
+line=||Bone-Carver Dagny looks up from her ledger of the dead. "Resurrection? {DAGNY_PRICE} gold, and the Choir takes its tithe in memories."|Resurrect me (pay).|goto:dagny_pay
+line=||"Corpse-heirlooms, fresh from the grave-robbers' market. If someone you knew died, their things might be here."|Browse heirlooms.|goto:dagny_shop
+line=|||End=>end
+
+[dialog:dagny:pay]
+line=|||End=>end
+
+[dialog:dagny:shop]
+line=|||End=>end
+
+[dialog:dagny:end]
+line=|||End=>end
+
+[dialog:wrong_magni:start]
+line=||Wrong Magni, caravan master of the Gilded Compact. "Everything's for sale, darling — even the rope. Prices depend on how much the Compact likes you. Currently: tolerable."|Browse wares.|goto:magni_store
+line=compact.trust>=3|"My favorite customer! Trust level {COMPACT_TRUST} — enjoy the discount, darling."|Browse wares.|goto:magni_store
+line=|||End=>end
+
+[dialog:wrong_magni:store]
+line=|||End=>end
+
+[dialog:wrong_magni:end]
+line=|||End=>end
+
+[dialog:ithra:start]
+line=||Lorekeeper Ithra, 200 years old, smiles. "The Sundering was no accident, child. The Order bottled a living thing and it screamed. Ask anyone else — they'll tell you it was an accident."|Tell me the truth.|goto:ithra_truth
+line=||"Nobody believes me. The libraries burned, the stones were moved. But the truth is in the contradictions, child — read both sides."|goto:ithra_end
+
+[dialog:ithra:truth]
+line=||"The Flameheart under the Crown was not an engine. It was alive. The Order set it off to kill what sleeps beneath — and failed. It is waking now. Your magic, child — that is its stirring."|goto:ithra_end|set:lore.ithra_truth=1
+
+[dialog:ithra:end]
+line=|||End=>end
+
+[dialog:vessel_quill:start]
+line=npc.vessel_quill==alive|Vessel Quill, Remnant. "Sela will kill me if she finds me — she killed the rest of my cell. Spells for sale, if you've coin. I don't forgive, but I sell."|Browse spells.|goto:quill_shop
+line=||Vessel Quill is dead. The Vigil's justice is thorough.|goto:quill_end
+
+[dialog:vessel_quill:shop]
+line=|||End=>end
+
+[dialog:vessel_quill:end]
+line=|||End=>end
+
+[dialog:unlit_whisper:start]
+line=act>=3|The voice is warm as a hearth: "You feel it too, little channel. I am the Unlit. I never lie — I have no need. Wake fully with me, and magic will be free as in the Age of Wonder."|...|goto:unlit_end
+line=||"When the Flameheart died, something beneath the Crown screamed. They wanted it dead. They failed. I am what woke."|goto:unlit_end
+
+[dialog:unlit_whisper:end]
+line=|||End=>end

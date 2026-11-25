@@ -1,0 +1,422 @@
+# GENERATED — 30 side quests, each answers lore/NPC/faction/build-gear (no kill-10-boars filler).
+
+[quest:q_side_01]
+title=Ash on the Wind
+act=1
+giver=haggar_moss
+region=emberfall
+desc=Ash on the Wind — the emberfall is full of them. (ember_hound)
+objectives=kill:ember_hound:4
+requires=act==1
+reward_xp=100
+reward_gold=52
+reward_items=health_vial
+on_complete=set:side.q_side_01.done=1
+unlocks=
+
+[quest:q_side_02]
+title=The Long Road Back
+act=1
+giver=choir_druid
+region=veil
+desc=The Long Road Back — the veil is full of them. (mire_wurm)
+objectives=kill:mire_wurm:5
+requires=act==1
+reward_xp=115
+reward_gold=60
+reward_items=health_vial
+on_complete=set:side.q_side_02.done=1
+unlocks=
+
+[quest:q_side_03]
+title=A Debt in Glass
+act=1
+giver=wrong_magni
+region=glass
+desc=A Debt in Glass — the glass is full of them. (glass_scorpion)
+objectives=kill:glass_scorpion:5
+requires=act==1
+reward_xp=115
+reward_gold=60
+reward_items=health_vial
+on_complete=set:side.q_side_03.done=1
+unlocks=
+
+[quest:q_side_04]
+title=Whispers in the Walls
+act=1
+giver=compact_factor
+region=maren
+desc=Whispers in the Walls — the maren is full of them. (drowned_knight)
+objectives=kill:drowned_knight:2
+requires=act==1
+reward_xp=70
+reward_gold=36
+reward_items=health_vial
+on_complete=set:side.q_side_04.done=1
+unlocks=
+
+[quest:q_side_05]
+title=The Choir's Price
+act=1
+giver=sela_vosch
+region=crown
+desc=The Choir's Price — the crown is full of them. (storm_revenant)
+objectives=kill:storm_revenant:3
+requires=act==1
+reward_xp=85
+reward_gold=44
+reward_items=health_vial
+on_complete=set:side.q_side_05.done=1
+unlocks=
+
+[quest:q_side_06]
+title=Maren's Echo
+act=1
+giver=dagny
+region=emberfall
+desc=Maren's Echo — the emberfall is full of them. (ember_hound)
+objectives=kill:ember_hound:4
+requires=act==1
+reward_xp=100
+reward_gold=52
+reward_items=health_vial
+on_complete=set:side.q_side_06.done=1
+unlocks=
+
+[quest:q_side_07]
+title=Crown Frost
+act=2
+giver=ithra
+region=veil
+desc=Crown Frost — the veil is full of them. (thorn_stalker)
+objectives=kill:thorn_stalker:2
+requires=act==2
+reward_xp=70
+reward_gold=36
+reward_items=health_vial
+on_complete=set:side.q_side_07.done=1
+unlocks=
+
+[quest:q_side_08]
+title=Ember Debts
+act=2
+giver=wrong_magni
+region=glass
+desc=Ember Debts — the glass is full of them. (mirage_knight)
+objectives=kill:mirage_knight:2
+requires=act==2
+reward_xp=70
+reward_gold=36
+reward_items=health_vial
+on_complete=set:side.q_side_08.done=1
+unlocks=
+
+[quest:q_side_09]
+title=Veil Rot
+act=2
+giver=vessel_quill
+region=maren
+desc=Veil Rot — the maren is full of them. (air_squid)
+objectives=kill:air_squid:4
+requires=act==2
+reward_xp=100
+reward_gold=52
+reward_items=health_vial
+on_complete=set:side.q_side_09.done=1
+unlocks=
+
+[quest:q_side_10]
+title=Storm Debts
+act=2
+giver=unlit_whisper
+region=crown
+desc=Storm Debts — the crown is full of them. (frost_giant)
+objectives=kill:frost_giant:5
+requires=act==2
+reward_xp=115
+reward_gold=60
+reward_items=health_vial
+on_complete=set:side.q_side_10.done=1
+unlocks=
+
+[quest:q_side_11]
+title=The Miser's List
+act=2
+giver=wrong_magni
+region=emberfall
+desc=The Miser's List — the emberfall is full of them. (ember_hound)
+objectives=kill:ember_hound:2
+requires=act==2
+reward_xp=70
+reward_gold=36
+reward_items=health_vial
+on_complete=set:side.q_side_11.done=1
+unlocks=
+
+[quest:q_side_12]
+title=Bones for Dagny
+act=2
+giver=choir_druid
+region=veil
+desc=Bones for Dagny — the veil is full of them. (veil_mote)
+objectives=kill:veil_mote:3
+requires=act==2
+reward_xp=85
+reward_gold=44
+reward_items=health_vial
+on_complete=set:side.q_side_12.done=1
+unlocks=
+
+[quest:q_side_13]
+title=The Moving Forest
+act=3
+giver=wrong_magni
+region=glass
+desc=The Moving Forest — the glass is full of them. (mirror_wraith)
+objectives=kill:mirror_wraith:4
+requires=act==3
+reward_xp=100
+reward_gold=52
+reward_items=health_vial
+on_complete=set:side.q_side_13.done=1
+unlocks=
+
+[quest:q_side_14]
+title=Sunken Bells
+act=3
+giver=compact_factor
+region=maren
+desc=Sunken Bells — the maren is full of them. (tide_leech)
+objectives=kill:tide_leech:4
+requires=act==3
+reward_xp=100
+reward_gold=52
+reward_items=health_vial
+on_complete=set:side.q_side_14.done=1
+unlocks=
+
+[quest:q_side_15]
+title=Crown Silence
+act=3
+giver=sela_vosch
+region=crown
+desc=Crown Silence — the crown is full of them. (storm_revenant)
+objectives=kill:storm_revenant:2
+requires=act==3
+reward_xp=70
+reward_gold=36
+reward_items=health_vial
+on_complete=set:side.q_side_15.done=1
+unlocks=
+
+[quest:q_side_16]
+title=Looter's Mark
+act=3
+giver=sela_vosch
+region=emberfall
+desc=Looter's Mark — the emberfall is full of them. (ember_hound)
+objectives=kill:ember_hound:5
+requires=act==3
+reward_xp=115
+reward_gold=60
+reward_items=health_vial
+on_complete=set:side.q_side_16.done=1
+unlocks=
+
+[quest:q_side_17]
+title=Librarian's Dues
+act=3
+giver=ithra
+region=veil
+desc=Librarian's Dues — the veil is full of them. (mire_wurm)
+objectives=kill:mire_wurm:2
+requires=act==3
+reward_xp=70
+reward_gold=36
+reward_items=health_vial
+on_complete=set:side.q_side_17.done=1
+unlocks=
+
+[quest:q_side_18]
+title=Cart and Horse
+act=3
+giver=wrong_magni
+region=glass
+desc=Cart and Horse — the glass is full of them. (glass_scorpion)
+objectives=kill:glass_scorpion:4
+requires=act==3
+reward_xp=100
+reward_gold=52
+reward_items=health_vial
+on_complete=set:side.q_side_18.done=1
+unlocks=
+
+[quest:q_side_19]
+title=The Third Banner
+act=4
+giver=vessel_quill
+region=maren
+desc=The Third Banner — the maren is full of them. (drowned_knight)
+objectives=kill:drowned_knight:4
+requires=act==4
+reward_xp=100
+reward_gold=52
+reward_items=health_vial
+on_complete=set:side.q_side_19.done=1
+unlocks=
+
+[quest:q_side_20]
+title=Graveside News
+act=4
+giver=unlit_whisper
+region=crown
+desc=Graveside News — the crown is full of them. (frost_giant)
+objectives=kill:frost_giant:4
+requires=act==4
+reward_xp=100
+reward_gold=52
+reward_items=health_vial
+on_complete=set:side.q_side_20.done=1
+unlocks=
+
+[quest:q_side_21]
+title=Tide Tables
+act=4
+giver=haggar_moss
+region=emberfall
+desc=Tide Tables — the emberfall is full of them. (ember_hound)
+objectives=kill:ember_hound:2
+requires=act==4
+reward_xp=70
+reward_gold=36
+reward_items=health_vial
+on_complete=set:side.q_side_21.done=1
+unlocks=
+
+[quest:q_side_22]
+title=Glass Memory
+act=4
+giver=choir_druid
+region=veil
+desc=Glass Memory — the veil is full of them. (thorn_stalker)
+objectives=kill:thorn_stalker:5
+requires=act==4
+reward_xp=115
+reward_gold=60
+reward_items=health_vial
+on_complete=set:side.q_side_22.done=1
+unlocks=
+
+[quest:q_side_23]
+title=Frozen Ledger
+act=4
+giver=wrong_magni
+region=glass
+desc=Frozen Ledger — the glass is full of them. (mirage_knight)
+objectives=kill:mirage_knight:5
+requires=act==4
+reward_xp=115
+reward_gold=60
+reward_items=health_vial
+on_complete=set:side.q_side_23.done=1
+unlocks=
+
+[quest:q_side_24]
+title=Ashkar Oaths
+act=4
+giver=compact_factor
+region=maren
+desc=Ashkar Oaths — the maren is full of them. (air_squid)
+objectives=kill:air_squid:4
+requires=act==4
+reward_xp=100
+reward_gold=52
+reward_items=health_vial
+on_complete=set:side.q_side_24.done=1
+unlocks=
+
+[quest:q_side_25]
+title=Choir Seeds
+act=5
+giver=sela_vosch
+region=crown
+desc=Choir Seeds — the crown is full of them. (storm_revenant)
+objectives=kill:storm_revenant:2
+requires=act==5
+reward_xp=70
+reward_gold=36
+reward_items=health_vial
+on_complete=set:side.q_side_25.done=1
+unlocks=
+
+[quest:q_side_26]
+title=Compact Ledgers
+act=5
+giver=dagny
+region=emberfall
+desc=Compact Ledgers — the emberfall is full of them. (ember_hound)
+objectives=kill:ember_hound:2
+requires=act==5
+reward_xp=70
+reward_gold=36
+reward_items=health_vial
+on_complete=set:side.q_side_26.done=1
+unlocks=
+
+[quest:q_side_27]
+title=The Whisper's Fee
+act=5
+giver=ithra
+region=veil
+desc=The Whisper's Fee — the veil is full of them. (veil_mote)
+objectives=kill:veil_mote:3
+requires=act==5
+reward_xp=85
+reward_gold=44
+reward_items=health_vial
+on_complete=set:side.q_side_27.done=1
+unlocks=
+
+[quest:q_side_28]
+title=Sigil Hunt
+act=5
+giver=wrong_magni
+region=glass
+desc=Sigil Hunt — the glass is full of them. (mirror_wraith)
+objectives=kill:mirror_wraith:4
+requires=act==5
+reward_xp=100
+reward_gold=52
+reward_items=health_vial
+on_complete=set:side.q_side_28.done=1
+unlocks=
+
+[quest:q_side_29]
+title=Warden's Errands
+act=5
+giver=vessel_quill
+region=maren
+desc=Warden's Errands — the maren is full of them. (tide_leech)
+objectives=kill:tide_leech:3
+requires=act==5
+reward_xp=85
+reward_gold=44
+reward_items=health_vial
+on_complete=set:side.q_side_29.done=1
+unlocks=
+
+[quest:q_side_30]
+title=Maw's Teeth
+act=5
+giver=unlit_whisper
+region=crown
+desc=Maw's Teeth — the crown is full of them. (frost_giant)
+objectives=kill:frost_giant:2
+requires=act==5
+reward_xp=70
+reward_gold=36
+reward_items=health_vial
+on_complete=set:side.q_side_30.done=1
+unlocks=
+

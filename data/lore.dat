@@ -1,0 +1,184 @@
+# GENERATED — 25+ lore documents, contradicting pairs marked in 'contradicts', one hidden endgame book (brief 2.7).
+
+[doc:lore_order_catechism]
+title=Catechism of the Order
+text=The Sundering was an accident: the Flameheart ruptured under siege. Mourn it. Fear it. Never bottle it again.
+map=cinderhold
+contradicts=
+hidden=false
+
+[doc:lore_ithra_stone]
+title=Ithra's Runestone
+text=The Sundering was deliberate. The Flameheart was alive; its death-cry was the weapon. They aimed it at what sleeps under the Crown.
+map=veil_area2
+contradicts=lore_order_catechism
+hidden=false
+
+[doc:lore_maren_tide]
+title=Tide-Record of Maren
+text=The sea rose because the Sundering cracked the shelf. A tragedy of nature, not a weapon.
+map=maren_area1
+contradicts=
+hidden=false
+
+[doc:lore_maren_king]
+title=The Drowned King's Last Edict
+text=We bottled the Flameheart ourselves to kill the thing in the Crown. It failed. Burn this record.
+map=maren_dungeon
+contradicts=lore_maren_tide
+hidden=false
+
+[doc:lore_glass_mirage]
+title=Mirage Inscription
+text=The Wastes remember the day before. Nothing was destroyed there — everything was *shown*.
+map=glass_area1
+contradicts=
+hidden=false
+
+[doc:lore_glass_true]
+title=Glass-True Fragment
+text=The Wastes are the wound. The Sundering detonated here, in the heart of the Order's bottling vault.
+map=glass_dungeon
+contradicts=lore_glass_mirage
+hidden=false
+
+[doc:lore_veil_1]
+title=Veil Library Leaf I
+text=The Flameheart sang to the forest. The forest remembers the song.
+map=veil_area1
+contradicts=
+hidden=false
+
+[doc:lore_veil_2]
+title=Veil Library Leaf II
+text=The song was a scream. The Flameheart did not rupture — it was killed. Something under the Crown answered.
+map=veil_dungeon
+contradicts=lore_veil_1
+hidden=false
+
+[doc:lore_remnant_1]
+title=Remnant Verbatim I
+text=We bottled it. We were ordered to. The Crown thing did not die.
+map=maren_dungeon
+contradicts=
+hidden=false
+
+[doc:lore_remnant_2]
+title=Remnant Verbatim II
+text=Every mage born since is a channel of its waking. The Order knew. That was the point.
+map=maren_dungeon
+contradicts=
+hidden=false
+
+[doc:lore_cinder_1]
+title=Cinderhold Charter
+text=Founded on the ash of the Sundering. The Vigil keeps the peace. The Order is extinct.
+map=cinderhold
+contradicts=
+hidden=false
+
+[doc:lore_cinder_2]
+title=Ash Farmer's Almanac
+text=Six hundred years of ash. The monsters organized the year the new mages appeared. Coincidence?
+map=emberfall_area2
+contradicts=
+hidden=false
+
+[doc:lore_ember_banner]
+title=War-Banner Shred
+text=Bears the Order sigil. The Order is extinct. Therefore someone forges history.
+map=emberfall_area1
+contradicts=
+hidden=false
+
+[doc:lore_ember_3]
+title=Cultist Confession
+text=We do not serve the Order. We flee the same dark as everyone. The banners are camouflage.
+map=emberfall_dungeon
+contradicts=
+hidden=false
+
+[doc:lore_veil_3]
+title=Choir Hymn
+text=Nature's heart was the Flameheart. Restore it and the Veil will sing again.
+map=veil_hub
+contradicts=
+hidden=false
+
+[doc:lore_glass_2]
+title=Glass Wastes Survey
+text=Mirage density peaks at the old vault. What the glass shows is 600 years ago, screaming.
+map=glass_area2
+contradicts=
+hidden=false
+
+[doc:lore_maren_3]
+title=Leviathan's Dream
+text=It dreams of fire under the mountain. It has dreamed it for 600 years.
+map=maren_area2
+contradicts=
+hidden=false
+
+[doc:lore_crown_1]
+title=Crown Ingress Log
+text=The rulers sealed themselves in before the Sundering. They knew what was under them.
+map=crown_area1
+contradicts=
+hidden=false
+
+[doc:lore_crown_2]
+title=Storm Choir Record
+text=The Unlit whispered through the storm that night. It has whispered ever since, to every mage born.
+map=crown_area2
+contradicts=
+hidden=false
+
+[doc:lore_ashkar_1]
+title=Ashkar Manifesto
+text=Magic is a chain. We broke the Order's chains; we will burn any hand that reforges them.
+map=cinderhold
+contradicts=
+hidden=false
+
+[doc:lore_compact_1]
+title=Compact Ledger Fragment
+text=We fund everyone and trust no one. Prices are loyalty, and loyalty is priced.
+map=maren_hub
+contradicts=
+hidden=false
+
+[doc:lore_veil_4]
+title=Ithra's Marginalia
+text=They burned my books. Read the stones instead. The stones contradict the books. Always.
+map=veil_area2
+contradicts=
+hidden=false
+
+[doc:lore_glass_3]
+title=Mirage of the Bottling
+text=A memory in the glass: robed figures around a heart of light. The heart was breathing.
+map=glass_area1
+contradicts=
+hidden=false
+
+[doc:lore_maren_4]
+title=Air-Pocket Prayer
+text=Something vast moved under the Crown the night the sea fell. It is still moving.
+map=maren_area2
+contradicts=
+hidden=false
+
+[doc:lore_crown_3]
+title=Frost Inscription
+text=Do not wake it. Do not bottle it. Let the Flameheart sleep — it was never an engine.
+map=crown_dungeon
+contradicts=
+hidden=false
+
+[doc:lore_unlit_codex]
+title=The Unlit Codex
+text=HIDDEN. The truth the Order sealed: the Flameheart can be reignited by a willing host, binding the Unlit. This book is the third path's key.
+map=crown_dungeon
+contradicts=
+hidden=true
+
