@@ -23,6 +23,53 @@ type
     glyphs: PGlyphInfo;
   end;
   TCamera2D = record offset, target: TVector2; rotation, zoom: Single; end;
+  PVector3 = ^TVector3;
+  TVector3 = record x, y, z: Single; end;
+  TVector4 = record x, y, z, w: Single; end;
+  TMatrix = record
+    m0, m4, m8, m12: Single;
+    m1, m5, m9, m13: Single;
+    m2, m6, m10, m14: Single;
+    m3, m7, m11, m15: Single;
+  end;
+  PMatrix = ^TMatrix;
+  TRay = record position, direction: TVector3; end;
+  TRayCollision = record hit: Boolean; distance: Single; point, normal: TVector3; end;
+  TBoundingBox = record min, max: TVector3; end;
+  TCamera3D = record
+    position, target, up: TVector3;
+    fovy: Single;        // perspective: degrees; orthographic: near plane height in world units
+    projection: Integer; // CAMERA_PERSPECTIVE / CAMERA_ORTHOGRAPHIC
+  end;
+  TShader = record id: LongWord; locs: PInteger; end;
+  PMaterialMap = ^TMaterialMap;
+  TMaterialMap = record texture: TTexture2D; color: TColor; value: Single; end;
+  TMaterial = record shader: TShader; maps: PMaterialMap; params: array[0..3] of Single; end;
+  PMaterial = ^TMaterial;
+  PMesh = ^TMesh;
+  TMesh = record
+    vertexCount, triangleCount: Integer;
+    vertices, texcoords, texcoords2, normals, tangents: PSingle;
+    colors: PByte;
+    indices: PWord;
+    boneCount: Integer;
+    boneIndices: PByte;
+    boneWeights: PSingle;
+    animVertices, animNormals: PSingle;
+    vaoId: LongWord;
+    vboId: PLongWord;
+  end;
+  TModelSkeleton = record boneCount: LongWord; bones, bindPose: Pointer; end;
+  TModel = record
+    transform: TMatrix;
+    meshCount, materialCount: Integer;
+    meshes: PMesh;
+    materials: PMaterial;
+    meshMaterial: PInteger;
+    skeleton: TModelSkeleton;
+    currentPose: Pointer;
+    boneMatrices: PMatrix;
+  end;
 
 const
   // ConfigFlags
@@ -36,6 +83,14 @@ const
   // TextureFilter
   TEXTURE_FILTER_POINT = 0;
   TEXTURE_FILTER_BILINEAR = 1;
+  // TextureWrap
+  TEXTURE_WRAP_REPEAT = 0;
+  TEXTURE_WRAP_CLAMP = 1;
+  // CameraProjection
+  CAMERA_PERSPECTIVE = 0;
+  CAMERA_ORTHOGRAPHIC = 1;
+  // MaterialMapIndex
+  MATERIAL_MAP_ALBEDO = 0;
   // MouseButton
   MOUSE_BUTTON_LEFT = 0; MOUSE_BUTTON_RIGHT = 1; MOUSE_BUTTON_MIDDLE = 2;
   // KeyboardKey (subset)
@@ -199,6 +254,50 @@ function GetColor(hexValue: LongWord): TColor; cdecl; external 'raylib' name 'Ge
 function CheckCollisionRecs(rec1, rec2: TRectangle): Boolean; cdecl; external 'raylib' name 'CheckCollisionRecs';
 function CheckCollisionPointRec(point: TVector2; rec: TRectangle): Boolean; cdecl; external 'raylib' name 'CheckCollisionPointRec';
 function CheckCollisionPointCircle(point, center: TVector2; radius: Single): Boolean; cdecl; external 'raylib' name 'CheckCollisionPointCircle';
+
+// 3D mode / camera / picking
+procedure BeginMode3D(camera: TCamera3D); cdecl; external 'raylib' name 'BeginMode3D';
+procedure EndMode3D; cdecl; external 'raylib' name 'EndMode3D';
+function GetScreenToWorldRay(mousePosition: TVector2; camera: TCamera3D): TRay; cdecl; external 'raylib' name 'GetScreenToWorldRay';
+function GetWorldToScreen(position: TVector3; camera: TCamera3D): TVector2; cdecl; external 'raylib' name 'GetWorldToScreen';
+function MatrixTranslate(x, y, z: Single): TMatrix; cdecl; external 'raylib' name 'MatrixTranslate';
+function MatrixScale(x, y, z: Single): TMatrix; cdecl; external 'raylib' name 'MatrixScale';
+function MatrixRotateX(angle: Single): TMatrix; cdecl; external 'raylib' name 'MatrixRotateX';
+function MatrixRotateZ(angle: Single): TMatrix; cdecl; external 'raylib' name 'MatrixRotateZ';
+function MatrixMultiply(left, right: TMatrix): TMatrix; cdecl; external 'raylib' name 'MatrixMultiply';
+
+// 3D shapes (immediate mode)
+procedure DrawCube(position: TVector3; width, height, length: Single; color: TColor); cdecl; external 'raylib' name 'DrawCube';
+procedure DrawCubeV(position, size: TVector3; color: TColor); cdecl; external 'raylib' name 'DrawCubeV';
+procedure DrawCubeWiresV(position, size: TVector3; color: TColor); cdecl; external 'raylib' name 'DrawCubeWiresV';
+procedure DrawSphere(centerPos: TVector3; radius: Single; color: TColor); cdecl; external 'raylib' name 'DrawSphere';
+procedure DrawCylinder(position: TVector3; radiusTop, radiusBottom, height: Single; sides: Integer; color: TColor); cdecl; external 'raylib' name 'DrawCylinder';
+procedure DrawPlane(centerPos: TVector3; size: TVector2; color: TColor); cdecl; external 'raylib' name 'DrawPlane';
+procedure DrawGrid(slices: Integer; spacing: Single); cdecl; external 'raylib' name 'DrawGrid';
+procedure DrawCircle3D(center: TVector3; radius: Single; rotationAxis: TVector3; rotationAngle: Single; color: TColor); cdecl; external 'raylib' name 'DrawCircle3D';
+procedure DrawLine3D(startPos, endPos: TVector3; color: TColor); cdecl; external 'raylib' name 'DrawLine3D';
+procedure DrawTriangle3D(v1, v2, v3: TVector3; color: TColor); cdecl; external 'raylib' name 'DrawTriangle3D';
+
+// meshes / models / materials
+procedure UploadMesh(var mesh: TMesh; isDynamic: Boolean); cdecl; external 'raylib' name 'UploadMesh';
+function GenMeshCube(width, height, length: Single): TMesh; cdecl; external 'raylib' name 'GenMeshCube';
+function GenMeshPlane(width, length: Single; resX, resZ: Integer): TMesh; cdecl; external 'raylib' name 'GenMeshPlane';
+function GenMeshSphere(radius: Single; rings, slices: Integer): TMesh; cdecl; external 'raylib' name 'GenMeshSphere';
+function GenMeshCylinder(radius, height: Single; slices: Integer): TMesh; cdecl; external 'raylib' name 'GenMeshCylinder';
+function LoadModelFromMesh(mesh: TMesh): TModel; cdecl; external 'raylib' name 'LoadModelFromMesh';
+procedure DrawModel(model: TModel; position: TVector3; scale: Single; tint: TColor); cdecl; external 'raylib' name 'DrawModel';
+procedure DrawModelEx(model: TModel; position: TVector3; rotationAxis: TVector3; rotationAngle: Single; scale: TVector3; tint: TColor); cdecl; external 'raylib' name 'DrawModelEx';
+procedure DrawMesh(mesh: TMesh; material: TMaterial; transform: TMatrix); cdecl; external 'raylib' name 'DrawMesh';
+function LoadMaterialDefault: TMaterial; cdecl; external 'raylib' name 'LoadMaterialDefault';
+procedure SetMaterialTexture(material: PMaterial; mapType: Integer; texture: TTexture2D); cdecl; external 'raylib' name 'SetMaterialTexture';
+procedure DrawBillboard(camera: TCamera3D; texture: TTexture2D; position: TVector3; scale: Single; tint: TColor); cdecl; external 'raylib' name 'DrawBillboard';
+
+// textures from files / images
+function LoadImage(const fileName: PAnsiChar): TImage; cdecl; external 'raylib' name 'LoadImage';
+function LoadTexture(const fileName: PAnsiChar): TTexture2D; cdecl; external 'raylib' name 'LoadTexture';
+procedure SetTextureWrap(texture: TTexture2D; wrap: Integer); cdecl; external 'raylib' name 'SetTextureWrap';
+procedure ImageDrawPixel(dst: PImage; posX, posY: Integer; color: TColor); cdecl; external 'raylib' name 'ImageDrawPixel';
+function GetRayCollisionQuad(ray: TRay; p1, p2, p3, p4: TVector3): TRayCollision; cdecl; external 'raylib' name 'GetRayCollisionQuad';
 
 implementation
 end.

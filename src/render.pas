@@ -24,7 +24,6 @@ var
   font: TFont;
   state: TGameState = gsTitle;
   overlay: TOverlay = ovNone;
-  camTarget: TVector2;
   shake: Single = 0;
   optShake, optTelegraph, optDmgNum: Boolean;
   shotMode: Boolean;
@@ -143,14 +142,6 @@ begin
   Result.x := x; Result.y := y;
 end;
 
-function MkCam: TCamera2D;
-begin
-  Result.offset := MkV(SCREEN_W / 2, SCREEN_H / 2);
-  Result.target := camTarget;
-  Result.rotation := 0;
-  Result.zoom := 1;
-end;
-
 procedure Panel(x, y, w, h: Integer; title: string);
 begin
   DrawRectangleRec(MkRec(x, y, w, h), Fade(BLACK, 0.82));
@@ -163,218 +154,621 @@ begin
 end;
 
 
-{ ---------------- world ---------------- }
+{ ---------------- world — TRUE 3D renderer ----------------
+  Fixed-angle orthographic 3D camera (classic 2:1 dimetric: elevation atan(1/2),
+  azimuth 45 deg) via raylib BeginMode3D. Real 3D geometry: one hand-built unit
+  cube mesh (CCW faces, uploaded with UploadMesh — raylib 6.2's GenMesh* SIGFPE'd
+  sporadically from Pascal, so no GenMesh* is used) scaled/rotated per draw call
+  with textured materials (procedurally generated textures, deterministic seed;
+  CC0 download was blocked by sandbox policy — see README). Props: extruded wall
+  boxes, trunk boxes, canopy boxes, portal columns, water slabs. Characters are
+  camera-facing billboards with generated silhouette textures. Depth buffer
+  handles occlusion. 2D pass after EndMode3D draws labels/HP bars. }
 
-function TileColor(ch: Char; ts: string; x, y: Integer): TColor;
+const
+  CAM_DIST = 26.0;
+  CAM_FOVY = 23.0;   // ortho near-plane height in world units (~23 tiles vertical)
+  NTILESETS = 6;
+
+type
+  TMoveMark = record x, y, t: Single; end;
+
 var
-  v: Integer;
-  r, g, b: Integer;
-  procedure SetC(rr, gg, bb: Integer);
-  begin
-    v := (x * 73 + y * 151) mod 3;
-    r := ClampI(rr + v * 4, 0, 255); g := ClampI(gg + v * 4, 0, 255); b := ClampI(bb + v * 4, 0, 255);
-    Result := MkCol(r, g, b);
-  end;
-begin
-  if ts = 'emberfall' then
-    case ch of
-      '#': SetC(28, 24, 22); 'o': SetC(96, 84, 72); '^': SetC(44, 38, 34);
-      ',': SetC(74, 64, 56); else SetC(58, 50, 46);
-    end
-  else if ts = 'veil' then
-    case ch of
-      '#': SetC(24, 20, 18); 'T': SetC(18, 42, 22); '~': SetC(30, 90, 60);
-      ',': SetC(42, 76, 44); else SetC(32, 62, 34);
-    end
-  else if ts = 'glass' then
-    case ch of
-      '#': SetC(48, 58, 64); '^': SetC(96, 116, 126); ',': SetC(150, 178, 188);
-      else SetC(122, 148, 158);
-    end
-  else if ts = 'maren' then
-    case ch of
-      '#': SetC(22, 38, 56); '~': SetC(28, 108, 158); ',': SetC(48, 92, 122);
-      else SetC(38, 78, 108);
-    end
-  else if ts = 'crown' then
-    case ch of
-      '#': SetC(88, 98, 118); '^': SetC(126, 146, 166); '~': SetC(58, 118, 168);
-      ',': SetC(186, 198, 214); else SetC(206, 216, 228);
-    end
-  else
-    case ch of
-      '#': SetC(30, 26, 22); ',': SetC(96, 84, 70); else SetC(84, 72, 60);
-    end;
-end;
-
-
-
-
-
-
-
-
-
-procedure DrawTileDiamond(sx, sy: Single; col: TColor);
-var
-  top, right, bottom, left: TVector2;
-begin
-  top := MkV(sx + 32, sy);
-  right := MkV(sx + 64, sy + 16);
-  bottom := MkV(sx + 32, sy + 32);
-  left := MkV(sx, sy + 16);
-  DrawTriangle(top, left, bottom, col);
-  DrawTriangle(top, bottom, right, col);
-end;
-
-
-
+  cam3: TCamera3D;
+  animT: Single = 0;
+  texRnd: UInt64 = 88172645463325252;
+  gCube: TMesh;
+  gFloorMat, gWallMat: array[0..NTILESETS-1] of TMaterial;
+  gMatRock, gMatTrunk, gMatCanopy, gMatWater, gMatPortal, gMatUnder: TMaterial;
+  billCache: array of record key: string; tex: TTexture2D; end;
+  moveMarks: array of TMoveMark;
+  lastMX, lastMY: Single;
+  hoverEnt: Integer = -1;
+  cursorState: Integer = 0; // 0=move 1=attack 2=talk 3=interact 4=unavailable
 
 function ElemCol(const elem: string): TColor; forward;
 function HasQuestFor(const npcId: string): Boolean; forward;
 
-procedure DrawWorld;
-var
-  x, y, i, j: Integer;
-  sx, sy: Single;
-  ch: Char;
-  idx: array of Integer;
-  tmp: Integer;
-  e: TEnt;
-  ex, ey: Single;
-  r: Single;
-  hpw: Single;
-  col: TColor;
+function NextRnd: UInt64;
 begin
-  // camera follows player (+shake)
-  WorldToScreen(GPlayer.x, GPlayer.y, camTarget.x, camTarget.y);
+  texRnd := texRnd xor (texRnd shl 13);
+  texRnd := texRnd xor (texRnd shr 7);
+  texRnd := texRnd xor (texRnd shl 17);
+  Result := texRnd;
+end;
+
+function V3(x, y, z: Single): TVector3;
+begin
+  Result.x := x; Result.y := y; Result.z := z;
+end;
+
+function TilesetIdx(const ts: string): Integer;
+begin
+  if ts = 'emberfall' then Result := 0
+  else if ts = 'veil' then Result := 1
+  else if ts = 'glass' then Result := 2
+  else if ts = 'maren' then Result := 3
+  else if ts = 'crown' then Result := 4
+  else Result := 5; // world
+end;
+
+{ ----- hand-built unit cube mesh (centered origin, side 1, CCW outward faces) ----- }
+
+procedure AddFace(var verts, norms: array of Single; var uvs: array of Single;
+  var idx: array of Word; var nv, ni: Integer;
+  const a, b, c, d: TVector3; const n: TVector3);
+var
+  base: Integer;
+begin
+  base := nv;
+  verts[nv * 3] := a.x; verts[nv * 3 + 1] := a.y; verts[nv * 3 + 2] := a.z; Inc(nv);
+  verts[nv * 3] := b.x; verts[nv * 3 + 1] := b.y; verts[nv * 3 + 2] := b.z; Inc(nv);
+  verts[nv * 3] := c.x; verts[nv * 3 + 1] := c.y; verts[nv * 3 + 2] := c.z; Inc(nv);
+  verts[nv * 3] := d.x; verts[nv * 3 + 1] := d.y; verts[nv * 3 + 2] := d.z; Inc(nv);
+  norms[base * 3] := n.x; norms[base * 3 + 1] := n.y; norms[base * 3 + 2] := n.z;
+  norms[(base + 1) * 3] := n.x; norms[(base + 1) * 3 + 1] := n.y; norms[(base + 1) * 3 + 2] := n.z;
+  norms[(base + 2) * 3] := n.x; norms[(base + 2) * 3 + 1] := n.y; norms[(base + 2) * 3 + 2] := n.z;
+  norms[(base + 3) * 3] := n.x; norms[(base + 3) * 3 + 1] := n.y; norms[(base + 3) * 3 + 2] := n.z;
+  uvs[base * 2] := 0; uvs[base * 2 + 1] := 0;
+  uvs[(base + 1) * 2] := 1; uvs[(base + 1) * 2 + 1] := 0;
+  uvs[(base + 2) * 2] := 1; uvs[(base + 2) * 2 + 1] := 1;
+  uvs[(base + 3) * 2] := 0; uvs[(base + 3) * 2 + 1] := 1;
+  idx[ni] := base; idx[ni + 1] := base + 1; idx[ni + 2] := base + 2;
+  idx[ni + 3] := base; idx[ni + 4] := base + 2; idx[ni + 5] := base + 3;
+  ni := ni + 6;
+end;
+
+procedure BuildCubeMesh;
+var
+  verts, norms: array[0..71] of Single;
+  uvs: array[0..47] of Single;
+  idx: array[0..35] of Word;
+  nv, ni: Integer;
+begin
+  nv := 0; ni := 0;
+  AddFace(verts, norms, uvs, idx, nv, ni, V3(0.5, -0.5, 0.5), V3(0.5, -0.5, -0.5), V3(0.5, 0.5, -0.5), V3(0.5, 0.5, 0.5), V3(1, 0, 0));
+  AddFace(verts, norms, uvs, idx, nv, ni, V3(-0.5, -0.5, -0.5), V3(-0.5, -0.5, 0.5), V3(-0.5, 0.5, 0.5), V3(-0.5, 0.5, -0.5), V3(-1, 0, 0));
+  AddFace(verts, norms, uvs, idx, nv, ni, V3(-0.5, 0.5, 0.5), V3(0.5, 0.5, 0.5), V3(0.5, 0.5, -0.5), V3(-0.5, 0.5, -0.5), V3(0, 1, 0));
+  AddFace(verts, norms, uvs, idx, nv, ni, V3(-0.5, -0.5, -0.5), V3(0.5, -0.5, -0.5), V3(0.5, -0.5, 0.5), V3(-0.5, -0.5, 0.5), V3(0, -1, 0));
+  AddFace(verts, norms, uvs, idx, nv, ni, V3(-0.5, -0.5, 0.5), V3(0.5, -0.5, 0.5), V3(0.5, 0.5, 0.5), V3(-0.5, 0.5, 0.5), V3(0, 0, 1));
+  AddFace(verts, norms, uvs, idx, nv, ni, V3(-0.5, -0.5, -0.5), V3(-0.5, 0.5, -0.5), V3(0.5, 0.5, -0.5), V3(0.5, -0.5, -0.5), V3(0, 0, -1));
+  gCube := Default(TMesh);
+  gCube.vertexCount := 24;
+  gCube.triangleCount := 12;
+  gCube.vertices := GetMem(24 * 3 * SizeOf(Single));
+  gCube.normals := GetMem(24 * 3 * SizeOf(Single));
+  gCube.texcoords := GetMem(24 * 2 * SizeOf(Single));
+  gCube.indices := GetMem(36 * SizeOf(Word));
+  Move(verts[0], gCube.vertices^, 24 * 3 * SizeOf(Single));
+  Move(norms[0], gCube.normals^, 24 * 3 * SizeOf(Single));
+  Move(uvs[0], gCube.texcoords^, 24 * 2 * SizeOf(Single));
+  Move(idx[0], gCube.indices^, 36 * SizeOf(Word));
+  UploadMesh(gCube, False);
+  Log('cube mesh uploaded: 24 verts, 12 tris');
+end;
+
+{ ----- procedural textures (deterministic, local xorshift — game RNG untouched) ----- }
+
+function FinishTex(img: TImage): TTexture2D;
+begin
+  Result := LoadTextureFromImage(img);
+  SetTextureFilter(Result, TEXTURE_FILTER_BILINEAR);
+  SetTextureWrap(Result, TEXTURE_WRAP_REPEAT);
+  UnloadImage(img);
+end;
+
+procedure NoisePass(var img: TImage; w, h: Integer; dark, light: TColor; pDark, pLight: Integer);
+var
+  x, y, n: Integer;
+begin
+  for y := 0 to h - 1 do
+    for x := 0 to w - 1 do
+    begin
+      n := Integer(NextRnd mod 100);
+      if n < pDark then
+        ImageDrawPixel(@img, x, y, dark)
+      else if n < pDark + pLight then
+      begin
+        n := Integer(NextRnd mod 20) - 10;
+        ImageDrawPixel(@img, x, y, MkCol(ClampI(light.r + n, 0, 255), ClampI(light.g + n, 0, 255), ClampI(light.b + n, 0, 255)));
+      end;
+    end;
+end;
+
+function GenTexGround(base, speck: TColor): TTexture2D;
+var
+  img: TImage;
+begin
+  img := GenImageColor(64, 64, base);
+  NoisePass(img, 64, 64, MkCol(0, 0, 0), speck, 22, 7);
+  Result := FinishTex(img);
+end;
+
+function GenTexBrick(brick, mortar: TColor): TTexture2D;
+var
+  img: TImage;
+  row, bx, off: Integer;
+begin
+  img := GenImageColor(64, 64, mortar);
+  for row := 0 to 7 do
+  begin
+    off := 0;
+    if (row mod 2) = 1 then off := 8;
+    for bx := -1 to 4 do
+      ImageDrawRectangle(@img, bx * 16 + off + 1, row * 8 + 1, 14, 6, brick);
+  end;
+  NoisePass(img, 64, 64, MkCol(0, 0, 0), brick, 18, 5);
+  Result := FinishTex(img);
+end;
+
+function GenTexRock(base: TColor): TTexture2D;
+var
+  img: TImage;
+  i, cx, cy, r: Integer;
+begin
+  img := GenImageColor(64, 64, base);
+  for i := 0 to 14 do
+  begin
+    cx := Integer(NextRnd mod 64); cy := Integer(NextRnd mod 64); r := 3 + Integer(NextRnd mod 9);
+    ImageDrawCircleV(@img, MkV(cx, cy), r, MkCol(ClampI(base.r - 25, 0, 255), ClampI(base.g - 25, 0, 255), ClampI(base.b - 25, 0, 255)));
+  end;
+  NoisePass(img, 64, 64, MkCol(0, 0, 0), base, 20, 4);
+  Result := FinishTex(img);
+end;
+
+function GenTexWood(base: TColor): TTexture2D;
+var
+  img: TImage;
+  x, y, plank: Integer;
+begin
+  img := GenImageColor(64, 64, base);
+  for x := 0 to 63 do
+  begin
+    plank := x div 16;
+    for y := 0 to 63 do
+      if (x mod 16 = 0) or (Integer(NextRnd mod 100) < 6) then
+        ImageDrawPixel(@img, x, y, MkCol(ClampI(base.r - 40 - plank * 6, 0, 255), ClampI(base.g - 34, 0, 255), ClampI(base.b - 24, 0, 255)))
+      else if Integer(NextRnd mod 100) < 8 then
+        ImageDrawPixel(@img, x, y, MkCol(ClampI(base.r + 22, 0, 255), ClampI(base.g + 18, 0, 255), ClampI(base.b + 12, 0, 255)));
+  end;
+  Result := FinishTex(img);
+end;
+
+function GenTexWater: TTexture2D;
+var
+  img: TImage;
+  x, y, v: Integer;
+begin
+  img := GenImageColor(64, 64, MkCol(28, 96, 160));
+  for y := 0 to 63 do
+    for x := 0 to 63 do
+    begin
+      v := Round(24 * Sin((y + 8 * Sin(x * 0.3)) * 0.35));
+      if v > 8 then ImageDrawPixel(@img, x, y, MkCol(120, 190, 235));
+    end;
+  Result := FinishTex(img);
+end;
+
+function GenTexGlass: TTexture2D;
+var
+  img: TImage;
+  x, y: Integer;
+begin
+  img := GenImageColor(64, 64, MkCol(148, 178, 190));
+  for y := 0 to 63 do
+    for x := 0 to 63 do
+      if ((x + y) mod 16 < 2) or ((x - y + 64) mod 24 < 2) then
+        ImageDrawPixel(@img, x, y, MkCol(215, 235, 240));
+  NoisePass(img, 64, 64, MkCol(90, 110, 120), MkCol(190, 215, 225), 10, 6);
+  Result := FinishTex(img);
+end;
+
+function GenTexSnow: TTexture2D;
+var
+  img: TImage;
+begin
+  img := GenImageColor(64, 64, MkCol(206, 216, 228));
+  NoisePass(img, 64, 64, MkCol(160, 172, 190), MkCol(240, 246, 252), 16, 8);
+  Result := FinishTex(img);
+end;
+
+{ ----- billboard (entity) textures, cached by key ----- }
+
+function BillTex(const key: string; kind: TEntKind; body: TColor; boss: Boolean): TTexture2D;
+var
+  i, cx, cy, r: Integer;
+  img: TImage;
+begin
+  for i := 0 to High(billCache) do
+    if billCache[i].key = key then Exit(billCache[i].tex);
+  img := GenImageColor(64, 64, BLANK);
+  cx := 32; cy := 34;
+  case kind of
+    ekMonster:
+    begin
+      if boss then r := 24 else r := 17;
+      ImageDrawCircleV(@img, MkV(cx, cy), r, body);
+      ImageDrawCircleLinesV(@img, MkV(cx, cy), r, MkCol(16, 12, 16));
+      ImageDrawCircleV(@img, MkV(cx - 6, cy - 4), 3, WHITE);
+      ImageDrawCircleV(@img, MkV(cx + 6, cy - 4), 3, WHITE);
+      ImageDrawCircleV(@img, MkV(cx - 6, cy - 4), 1, BLACK);
+      ImageDrawCircleV(@img, MkV(cx + 6, cy - 4), 1, BLACK);
+      if boss then
+      begin
+        ImageDrawTriangle(@img, MkV(cx - r + 2, cy - 8), MkV(cx - r - 9, cy - 20), MkV(cx - r + 10, cy - 16), body);
+        ImageDrawTriangle(@img, MkV(cx + r - 2, cy - 8), MkV(cx + r + 9, cy - 20), MkV(cx + r - 10, cy - 16), body);
+      end;
+    end;
+    ekNpc:
+    begin
+      ImageDrawRectangle(@img, cx - 10, cy + 2, 20, 22, MkCol(30, 110, 50));
+      ImageDrawCircleV(@img, MkV(cx, cy - 6), 9, MkCol(240, 210, 170));
+      ImageDrawCircleLinesV(@img, MkV(cx, cy - 6), 9, MkCol(20, 40, 24));
+    end;
+    ekChest:
+    begin
+      ImageDrawRectangle(@img, cx - 16, cy - 10, 32, 24, MkCol(110, 80, 46));
+      ImageDrawRectangleLines(@img, cx - 16, cy - 10, 32, 24, GOLD);
+      ImageDrawRectangle(@img, cx - 2, cy - 10, 4, 24, GOLD);
+    end;
+    ekLore:
+    begin
+      ImageDrawRectangle(@img, cx - 12, cy - 14, 24, 30, MkCol(232, 226, 205));
+      ImageDrawRectangleLines(@img, cx - 12, cy - 14, 24, 30, MkCol(90, 80, 60));
+      for i := 0 to 4 do
+        ImageDrawLine(@img, cx - 8, cy - 8 + i * 5, cx + 8, cy - 8 + i * 5, MkCol(120, 110, 90));
+    end;
+    ekMarker:
+    begin
+      ImageDrawTriangle(@img, MkV(cx, cy - 16), MkV(cx - 12, cy), MkV(cx + 12, cy), GOLD);
+      ImageDrawTriangle(@img, MkV(cx, cy + 16), MkV(cx - 12, cy), MkV(cx + 12, cy), MkCol(200, 150, 0));
+    end;
+    ekStore:
+    begin
+      ImageDrawCircleV(@img, MkV(cx, cy), 15, GOLD);
+      ImageDrawCircleLinesV(@img, MkV(cx, cy), 15, MkCol(140, 100, 0));
+      ImageDrawCircleV(@img, MkV(cx, cy), 7, MkCol(255, 230, 120));
+    end;
+    ekCorpse:
+    begin
+      ImageDrawCircleV(@img, MkV(cx, cy), 14, DARKGRAY);
+      ImageDrawLine(@img, cx - 8, cy - 8, cx + 8, cy + 8, BLACK);
+      ImageDrawLine(@img, cx + 8, cy - 8, cx - 8, cy + 8, BLACK);
+    end;
+  else
+    ImageDrawCircleV(@img, MkV(cx, cy), 12, body);
+  end;
+  if key = 'player' then
+  begin
+    ImageDrawCircleV(@img, MkV(cx, cy), 15, SKYBLUE);
+    ImageDrawCircleLinesV(@img, MkV(cx, cy), 15, WHITE);
+    ImageDrawLine(@img, cx + 8, cy + 12, cx + 22, cy - 6, WHITE);
+    ImageDrawLine(@img, cx + 10, cy + 14, cx + 24, cy - 4, WHITE);
+  end;
+  Result := LoadTextureFromImage(img);
+  SetTextureFilter(Result, TEXTURE_FILTER_BILINEAR);
+  UnloadImage(img);
+  SetLength(billCache, Length(billCache) + 1);
+  billCache[High(billCache)].key := key;
+  billCache[High(billCache)].tex := Result;
+end;
+
+function EntTexFor(const e: TEnt): TTexture2D;
+var
+  key: string;
+  body: TColor;
+begin
+  body := RED;
+  case e.kind of
+    ekMonster: begin key := 'mon:' + e.id; if e.element <> '' then body := ElemCol(e.element); end;
+    ekNpc: begin key := 'npc'; body := GREEN; end;
+    ekChest: key := 'chest';
+    ekLore: key := 'lore';
+    ekMarker: key := 'marker';
+    ekStore: key := 'store';
+    ekCorpse: key := 'corpse';
+  else key := 'misc'; body := GRAY;
+  end;
+  Result := BillTex(key, e.kind, body, e.boss);
+end;
+
+{ ----- assets ----- }
+
+function NewMat(tex: TTexture2D; tint: TColor): TMaterial;
+begin
+  Result := LoadMaterialDefault;
+  SetMaterialTexture(@Result, MATERIAL_MAP_ALBEDO, tex);
+  Result.maps[0].color := tint;
+end;
+
+procedure InitWorldAssets;
+begin
+  BuildCubeMesh;
+  gMatRock := NewMat(GenTexRock(MkCol(128, 118, 106)), WHITE);
+  gMatTrunk := NewMat(GenTexWood(MkCol(96, 72, 48)), WHITE);
+  gMatCanopy := NewMat(GenTexGround(MkCol(30, 80, 36), MkCol(18, 56, 24)), WHITE);
+  gMatWater := NewMat(GenTexWater, Fade(WHITE, 0.85));
+  gMatPortal := NewMat(GenTexGround(MkCol(255, 203, 0), MkCol(255, 240, 150)), Fade(WHITE, 0.45));
+  gMatUnder := NewMat(GenTexGround(MkCol(14, 12, 18), MkCol(30, 26, 36)), WHITE);
+  // per-tileset floor (flat slab) + wall (extruded box) materials
+  gFloorMat[0] := NewMat(GenTexGround(MkCol(108, 94, 82), MkCol(62, 52, 46)), WHITE);
+  gWallMat[0] := NewMat(GenTexBrick(MkCol(78, 66, 60), MkCol(36, 30, 27)), MkCol(255, 230, 214));
+  gFloorMat[1] := NewMat(GenTexGround(MkCol(58, 98, 62), MkCol(36, 68, 42)), WHITE);
+  gWallMat[1] := NewMat(GenTexBrick(MkCol(64, 72, 52), MkCol(30, 36, 24)), WHITE);
+  gFloorMat[2] := NewMat(GenTexGlass, WHITE);
+  gWallMat[2] := NewMat(GenTexRock(MkCol(140, 162, 174)), MkCol(230, 245, 255));
+  gFloorMat[3] := NewMat(GenTexGround(MkCol(92, 118, 140), MkCol(58, 82, 106)), WHITE);
+  gWallMat[3] := NewMat(GenTexBrick(MkCol(112, 122, 136), MkCol(48, 56, 68)), MkCol(210, 225, 240));
+  gFloorMat[4] := NewMat(GenTexSnow, WHITE);
+  gWallMat[4] := NewMat(GenTexRock(MkCol(168, 182, 202)), MkCol(235, 242, 255));
+  gFloorMat[5] := NewMat(GenTexGround(MkCol(100, 132, 68), MkCol(66, 98, 46)), WHITE);
+  gWallMat[5] := NewMat(GenTexRock(MkCol(112, 102, 86)), WHITE);
+  Log('world assets ready: cube mesh + 6 tilesets x (floor+wall materials), props, billboards');
+end;
+
+{ ----- draw helper: textured unit cube at pos/scale/rotZ ----- }
+
+procedure DrawBox(var mesh: TMesh; var mat: TMaterial; x, y, z, sx, sy, sz, rz: Single);
+var
+  tm, ts, tr: TMatrix;
+begin
+  ts := MatrixScale(sx, sy, sz);
+  if rz <> 0 then
+  begin
+    tr := MatrixRotateZ(rz);
+    ts := MatrixMultiply(tr, ts);
+  end;
+  tm := MatrixMultiply(MatrixTranslate(x, y, z), ts);
+  DrawMesh(mesh, mat, tm);
+end;
+
+{ ----- camera + picking ----- }
+
+procedure UpdateCamera;
+var
+  d, sx, sy: Single;
+begin
+  d := CAM_DIST;
+  sx := 0; sy := 0;
   if optShake and (shake > 0) then
   begin
-    camTarget.x := camTarget.x + (RndUInt64 mod 100 - 50) / 100 * shake * 8;
-    camTarget.y := camTarget.y + (RndUInt64 mod 100 - 50) / 100 * shake * 6;
+    sx := (NextRnd mod 100 - 50) / 100 * shake * 0.35;
+    sy := (NextRnd mod 100 - 50) / 100 * shake * 0.35;
   end;
-  // tiles
-  BeginMode2D(MkCam);
-  for y := 0 to GMap.h - 1 do
-    for x := 0 to GMap.w - 1 do
+  // 2:1 dimetric: elevation atan(1/2) = 26.565 deg, azimuth 45 deg; z is up
+  cam3.position := V3(GPlayer.x + 0.6325 * d + sx, GPlayer.y + 0.6325 * d + sy, 0.4472 * d);
+  cam3.target := V3(GPlayer.x, GPlayer.y, 0.2);
+  cam3.up := V3(0, 0, 1);
+  cam3.fovy := CAM_FOVY;
+  cam3.projection := CAMERA_ORTHOGRAPHIC;
+end;
+
+procedure MouseToWorld(mx, my: Single; out wx, wy: Single);
+var
+  ray: TRay;
+  t: Single;
+begin
+  ray := GetScreenToWorldRay(MkV(mx, my), cam3);
+  if Abs(ray.direction.z) < 1e-6 then
+  begin
+    wx := GPlayer.x; wy := GPlayer.y;
+    Exit;
+  end;
+  t := (0.02 - ray.position.z) / ray.direction.z; // intersect ground plane z=0.02
+  wx := ray.position.x + ray.direction.x * t;
+  wy := ray.position.y + ray.direction.y * t;
+end;
+
+procedure DrawGroundRing(cx, cy, r, z: Single; col: TColor);
+var
+  i: Integer;
+  a0, a1: Single;
+begin
+  for i := 0 to 27 do
+  begin
+    a0 := i / 28 * 2 * Pi;
+    a1 := (i + 1) / 28 * 2 * Pi;
+    DrawLine3D(V3(cx + Cos(a0) * r, cy + Sin(a0) * r, z), V3(cx + Cos(a1) * r, cy + Sin(a1) * r, z), col);
+  end;
+end;
+
+{ ----- world draw ----- }
+
+procedure DrawWorld;
+var
+  x, y, i: Integer;
+  ch: Char;
+  ts, v: Integer;
+  rng: Single;
+  x0, x1, y0, y1: Integer;
+  e: TEnt;
+  h, r: Single;
+  tint: TColor;
+  sp: TVector2;
+  ppu: Single; // pixels per world unit (vertical)
+  col: TColor;
+  hpw: Single;
+begin
+  ts := TilesetIdx(GMap.tileset);
+  rng := CAM_FOVY * 0.5 * (1 + SCREEN_W / SCREEN_H) * 0.85 + 3;
+  x0 := ClampI(Trunc(GPlayer.x - rng), 0, GMap.w - 1);
+  x1 := ClampI(Trunc(GPlayer.x + rng), 0, GMap.w - 1);
+  y0 := ClampI(Trunc(GPlayer.y - rng), 0, GMap.h - 1);
+  y1 := ClampI(Trunc(GPlayer.y + rng), 0, GMap.h - 1);
+  ClearBackground(MkCol(13, 11, 17));
+  BeginMode3D(cam3);
+  // void skirt under the map
+  DrawBox(gCube, gMatUnder, GMap.w / 2, GMap.h / 2, -0.25, GMap.w + 16, GMap.h + 16, 0.4, 0);
+  // passable tiles first
+  for y := y0 to y1 do
+    for x := x0 to x1 do
     begin
-      WorldToScreen(x, y, sx, sy);
       ch := TileAt(x, y);
-      DrawTileDiamond(sx, sy, TileColor(ch, GMap.tileset, x, y));
-      if ch = 'P' then
-        DrawPoly(MkV(sx + 32, sy + 16), 4, 20, 45, Fade(GOLD, 0.35 + 0.25 * Sin(GTime * 4)));
+      v := (x * 73 + y * 151) mod 3;
+      case ch of
+        '.', ',':
+          DrawBox(gCube, gFloorMat[ts], x + 0.5, y + 0.5, 0.06, 1, 1, 0.12, v * 0.19);
+        'o':
+          begin
+            DrawBox(gCube, gFloorMat[ts], x + 0.5, y + 0.5, 0.06, 1, 1, 0.12, 0);
+            DrawBox(gCube, gMatRock, x + 0.42 + v * 0.12, y + 0.45 + v * 0.1, 0.28, 0.5, 0.5, 0.5, v * 0.68);
+          end;
+        '~':
+          DrawBox(gCube, gMatWater, x + 0.5, y + 0.5, 0.05, 1, 1, 0.10, 0);
+        'P':
+          begin
+            DrawBox(gCube, gFloorMat[ts], x + 0.5, y + 0.5, 0.06, 1, 1, 0.12, 0);
+            DrawGroundRing(x + 0.5, y + 0.5, 0.42, 0.15, Fade(GOLD, 0.5 + 0.3 * Sin(animT * 4)));
+            DrawBox(gCube, gMatPortal, x + 0.5, y + 0.5, 0.75, 0.85, 0.85, 1.5, animT * 0.35);
+          end;
+      end;
     end;
-  // telegraphs (under entities)
+  // obstacles (depth buffer sorts occlusion)
+  for y := y0 to y1 do
+    for x := x0 to x1 do
+    begin
+      ch := TileAt(x, y);
+      v := (x * 73 + y * 151) mod 3;
+      case ch of
+        '#':
+          DrawBox(gCube, gWallMat[ts], x + 0.5, y + 0.5, 0.625, 1, 1, 1.25, v * 0.12);
+        'T':
+          begin
+            DrawBox(gCube, gFloorMat[ts], x + 0.5, y + 0.5, 0.06, 1, 1, 0.12, 0);
+            DrawBox(gCube, gMatTrunk, x + 0.5, y + 0.5, 0.5, 0.26, 0.26, 1.0, v * 0.23);
+            DrawBox(gCube, gMatCanopy, x + 0.5, y + 0.55, 1.3, 1.25 + v * 0.2, 1.25 + v * 0.2, 0.95 + v * 0.2, v * 0.5);
+          end;
+        '^':
+          DrawBox(gCube, gMatRock, x + 0.5, y + 0.5, 0.34, 0.95, 0.95, 0.68, v * 0.75);
+      end;
+    end;
+  // telegraphs (ground decals above floor top z=0.12)
   if optTelegraph then
     for i := 0 to High(GEnts) do
     begin
       e := GEnts[i];
       if (e.kind = ekMonster) and e.alive and (e.state = 2) then
       begin
-        WorldToScreen(e.x, e.y, ex, ey);
-        ex := ex + 32; ey := ey + 22;
-        r := e.attackRange * TILE_W / 2;
-        DrawCircleV(MkV(ex, ey), r, Fade(ORANGE, 0.22 + 0.15 * Sin(GTime * 18)));
-        DrawCircleLinesV(MkV(ex, ey), r, ORANGE);
-        // windup shrinking ring
-        DrawRing(MkV(ex, ey), r * Max(0.05, e.stateT / e.windup), r, 0, 360, 32, Fade(RED, 0.8));
+        r := e.attackRange;
+        DrawCircle3D(V3(e.x, e.y, 0.16), r, V3(1, 0, 0), -90, Fade(ORANGE, 0.20 + 0.12 * Sin(animT * 18)));
+        DrawGroundRing(e.x, e.y, r, 0.16, Fade(ORANGE, 0.9));
+        DrawGroundRing(e.x, e.y, Max(0.05, r * e.stateT / Max(0.001, e.windup)), 0.17, Fade(RED, 0.9));
       end;
     end;
-  // entities sorted by x+y (painter)
-  SetLength(idx, Length(GEnts));
-  for i := 0 to High(idx) do idx[i] := i;
-  for i := 0 to High(idx) - 1 do
-    for j := i + 1 to High(idx) do
-      if (GEnts[idx[j]].x + GEnts[idx[j]].y) < (GEnts[idx[i]].x + GEnts[idx[i]].y) then
-      begin
-        tmp := idx[i]; idx[i] := idx[j]; idx[j] := tmp;
-      end;
-  for i := 0 to High(idx) do
+  // click-to-move markers
+  for i := 0 to High(moveMarks) do
+    with moveMarks[i] do
+      DrawGroundRing(x, y, 0.28 + 0.08 * Sin(animT * 10), 0.15, Fade(GOLD, ClampF(t / 0.6, 0, 1)));
+  // entities: shadow + billboard (monsters/npcs/etc), sphere for projectiles
+  for i := 0 to High(GEnts) do
   begin
-    e := GEnts[idx[i]];
-    WorldToScreen(e.x, e.y, ex, ey);
-    ex := ex + 32; ey := ey + 24;
-    case e.kind of
-      ekMonster:
-        if e.alive then
-        begin
-          r := 13 * e.scale + e.size * 8;
-          if e.boss then col := MAROON else col := RED;
-          if e.enraged then col := ORANGE;
-          DrawCircleV(MkV(ex, ey - r), r, col);
-          DrawCircleLinesV(MkV(ex, ey - r), r, BLACK);
-          // facing tick
-          DrawLineEx(MkV(ex, ey - r), MkV(ex + Cos(e.facing) * (r + 6), ey - r + Sin(e.facing) * (r + 6)), 3, WHITE);
-          // hp bar
-          hpw := r * 2;
-          DrawRectangle(Round(ex - r), Round(ey - 2 * r - 8), Round(hpw), 5, BLACK);
-          DrawRectangle(Round(ex - r), Round(ey - 2 * r - 8), Round(hpw * Max(0, e.hp / e.maxhp)), 5, LIME);
-          if e.boss then Text(Round(ex - TextW(e.name, 14) / 2), Round(ey - 2 * r - 24), 14, e.name, GOLD);
-        end;
-      ekProjectile:
-        if e.alive then
-        begin
-          col := ElemCol(e.pelement);
-          DrawCircleV(MkV(ex, ey), 5, col);
-          DrawCircleLinesV(MkV(ex, ey), 5, WHITE);
-        end;
-      ekNpc:
-      begin
-        DrawCircleV(MkV(ex, ey - 8), 11, GREEN);
-        DrawCircleLinesV(MkV(ex, ey - 8), 11, BLACK);
-        Text(Round(ex - TextW(e.name, 13) / 2), Round(ey - 30), 13, e.name, RAYWHITE);
-        // quest marker
-        if HasQuestFor(e.id) then
-          Text(Round(ex + 6), Round(ey - 34), 20, '!', GOLD);
-      end;
-      ekChest:
-        if not e.used then
-        begin
-          DrawRectangle(Round(ex - 10), Round(ey - 14), 20, 14, BROWN);
-          DrawRectangleLines(Round(ex - 10), Round(ey - 14), 20, 14, GOLD);
-        end;
-      ekLore:
-        if not e.used then
-        begin
-          DrawRectangle(Round(ex - 7), Round(ey - 12), 14, 12, SKYBLUE);
-          Text(Round(ex - 4), Round(ey - 12), 12, 'i', BLACK);
-        end;
-      ekMarker:
-        if not e.used then
-        begin
-          DrawPoly(MkV(ex, ey - 12), 5, 9, 0, GOLD);
-          Text(Round(ex - TextW(e.caption, 12) / 2), Round(ey + 2), 12, e.caption, RAYWHITE);
-        end;
-      ekStore:
-        Text(Round(ex - 20), Round(ey - 30), 16, 'STORE', GOLD);
-      ekCorpse:
-        begin
-          DrawCircleV(MkV(ex, ey - 6), 10, DARKGRAY);
-          Text(Round(ex - TextW('corpse', 12) / 2), Round(ey + 4), 12, 'corpse (' + I2S(GPlayer.lostXP) + ' xp)', GRAY);
-        end;
+    e := GEnts[i];
+    if not e.alive then Continue;
+    if e.kind = ekProjectile then
+    begin
+      col := ElemCol(e.pelement);
+      DrawSphere(V3(e.x, e.y, 0.32), 0.14, col);
+      DrawSphere(V3(e.x, e.y, 0.32), 0.30, Fade(col, 0.25));
+      Continue;
     end;
+    case e.kind of
+      ekMonster: begin r := 0.35 + e.size * 0.3; h := (0.9 + e.size * 0.5) * (1 + e.scale * 0.4); if e.boss then h := h * 1.7; end;
+    else begin r := 0.32; h := 0.95; end;
+    end;
+    if e.boss then r := r * 1.5;
+    if (e.kind = ekChest) or (e.kind = ekLore) or (e.kind = ekMarker) then
+    begin
+      if e.used then Continue;
+      h := 0.55; r := 0.3;
+    end;
+    if e.kind = ekStore then begin h := 1.1; r := 0.4; end;
+    DrawCircle3D(V3(e.x, e.y, 0.13), r, V3(1, 0, 0), -90, Fade(BLACK, 0.4));
+    if e.kind = ekMonster then
+      tint := IIfC(e.enraged, ORANGE, IIfC(e.boss, MAROON, WHITE))
+    else
+      tint := WHITE;
+    DrawBillboard(cam3, EntTexFor(e), V3(e.x, e.y, 0.12 + h / 2), h, tint);
   end;
   // player
-  WorldToScreen(GPlayer.x, GPlayer.y, ex, ey);
-  ex := ex + 32; ey := ey + 24;
-  if GPlayer.dodgeT > 0 then col := Fade(SKYBLUE, 0.5) else col := SKYBLUE;
-  DrawCircleV(MkV(ex, ey - 10), 12, col);
-  DrawCircleLinesV(MkV(ex, ey - 10), 12, WHITE);
-  DrawLineEx(MkV(ex, ey - 10), MkV(ex + Cos(GPlayer.facing) * 20, ey - 10 + Sin(GPlayer.facing) * 20), 4, WHITE);
-  Text(Round(ex - TextW(GPlayer.name, 13) / 2), Round(ey - 34), 13, GPlayer.name, RAYWHITE);
-  // damage numbers
+  if not GPlayer.dead then
+  begin
+    if GPlayer.dodgeT > 0 then col := Fade(SKYBLUE, 0.6) else col := WHITE;
+    DrawCircle3D(V3(GPlayer.x, GPlayer.y, 0.13), 0.36, V3(1, 0, 0), -90, Fade(BLACK, 0.45));
+    DrawBillboard(cam3, BillTex('player', ekMonster, SKYBLUE, False), V3(GPlayer.x, GPlayer.y, 0.12 + 0.5), 1.0, col);
+    // facing tick in 3D
+    DrawLine3D(V3(GPlayer.x, GPlayer.y, 0.75), V3(GPlayer.x + Cos(GPlayer.facing) * 0.55, GPlayer.y + Sin(GPlayer.facing) * 0.55, 0.75), WHITE);
+  end;
+  EndMode3D;
+  // ---- 2D label pass (names, hp bars, markers, damage numbers, hover ring) ----
+  ppu := SCREEN_H / CAM_FOVY;
+  for i := 0 to High(GEnts) do
+  begin
+    e := GEnts[i];
+    if not e.alive then Continue;
+    if e.kind = ekProjectile then Continue;
+    if (e.kind in [ekChest, ekLore, ekMarker]) and e.used then Continue;
+    sp := GetWorldToScreen(V3(e.x, e.y, 0.12), cam3);
+    if e.kind = ekMonster then
+    begin
+      r := (0.35 + e.size * 0.3) * ppu;
+      if e.boss then r := r * 1.5;
+      hpw := r * 2;
+      DrawRectangle(Round(sp.x - r), Round(sp.y - 2 * r - 10), Round(hpw), 5, Fade(BLACK, 0.8));
+      DrawRectangle(Round(sp.x - r), Round(sp.y - 2 * r - 10), Round(hpw * Max(0, e.hp / Max(1, e.maxhp))), 5, LIME);
+      if e.boss then Text(Round(sp.x - TextW(e.name, 14) / 2), Round(sp.y - 2 * r - 26), 14, e.name, GOLD);
+    end;
+    if e.kind = ekNpc then
+    begin
+      Text(Round(sp.x - TextW(e.name, 13) / 2), Round(sp.y - 34), 13, e.name, RAYWHITE);
+      if HasQuestFor(e.id) then
+        Text(Round(sp.x + 8), Round(sp.y - 40), 20, '!', GOLD);
+    end;
+    if e.kind = ekMarker then
+      Text(Round(sp.x - TextW(e.caption, 12) / 2), Round(sp.y + 6), 12, e.caption, RAYWHITE);
+    if e.kind = ekStore then
+      Text(Round(sp.x - 20), Round(sp.y - 30), 16, 'STORE', GOLD);
+    if e.kind = ekCorpse then
+      Text(Round(sp.x - TextW('corpse', 12) / 2), Round(sp.y + 4), 12, 'corpse (' + I2S(GPlayer.lostXP) + ' xp)', GRAY);
+    if i = hoverEnt then
+    begin
+      r := 0.45 * ppu;
+      DrawCircleLinesV(MkV(sp.x, sp.y - 8), r, GOLD);
+    end;
+  end;
+  if not GPlayer.dead then
+  begin
+    sp := GetWorldToScreen(V3(GPlayer.x, GPlayer.y, 0.12), cam3);
+    Text(Round(sp.x - TextW(GPlayer.name, 13) / 2), Round(sp.y - 40), 13, GPlayer.name, RAYWHITE);
+  end;
   if optDmgNum then
     for i := 0 to High(GDmgNums) do
       with GDmgNums[i] do
       begin
-        WorldToScreen(x, y, ex, ey);
+        sp := GetWorldToScreen(V3(x, y, 0.5 + t * 0.8), cam3);
         if crit then col := GOLD else col := RAYWHITE;
-        Text(Round(ex + 32 - TextW(txt, 16) / 2), Round(ey + 16 - t * 30), 16, txt, Fade(col, 1 - t / 1.2));
+        Text(Round(sp.x - TextW(txt, 16) / 2), Round(sp.y - t * 30), 16, txt, Fade(col, 1 - t / 1.2));
       end;
-  EndMode2D;
 end;
-
-
 
 function ElemCol(const elem: string): TColor;
 var
@@ -397,6 +791,7 @@ begin
   Result := False;
 end;
 
+{ ---------------- HUD ---------------- }
 { ---------------- HUD ---------------- }
 
 procedure DrawBar(x, y, w: Integer; frac: Single; col: TColor; const lab: string);
@@ -1223,14 +1618,15 @@ begin
     if not IsBlocked(GPlayer.x, ny) then GPlayer.y := ny;
     if not mouseActive then GPlayer.facing := ArcTan2(dy, dx);
   end;
-  // mouse aim
+  // mouse aim (3D ray pick onto ground plane)
   mw := GetMousePosition;
-  if (Abs(mw.x - mouseWX) > 0.5) or (Abs(mw.y - mouseWY) > 0.5) or IsMouseButtonPressed(MOUSE_BUTTON_LEFT) or IsMouseButtonPressed(MOUSE_BUTTON_RIGHT) then
+  if (Abs(mw.x - lastMX) > 0.5) or (Abs(mw.y - lastMY) > 0.5) or IsMouseButtonPressed(MOUSE_BUTTON_LEFT) or IsMouseButtonPressed(MOUSE_BUTTON_RIGHT) then
   begin
     mouseActive := True;
-    ScreenToWorld(mw.x - SCREEN_W / 2 + camTarget.x, mw.y - SCREEN_H / 2 + camTarget.y, mouseWX, mouseWY);
+    MouseToWorld(mw.x, mw.y, mouseWX, mouseWY);
     GPlayer.facing := ArcTan2(mouseWY - GPlayer.y, mouseWX - GPlayer.x);
   end;
+  lastMX := mw.x; lastMY := mw.y;
   aimX := GPlayer.x + Cos(GPlayer.facing) * 2;
   aimY := GPlayer.y + Sin(GPlayer.facing) * 2;
   if mouseActive then begin aimX := mouseWX; aimY := mouseWY; end;
@@ -1324,6 +1720,7 @@ begin
   SetTargetFPS(60);
   SetExitKey(KEY_NULL);
   LoadGameFont;
+  InitWorldAssets;
   if shotMode then
   begin
     // scripted smoke run: title + chargen screenshots, then create char, hub, fight
@@ -1333,12 +1730,14 @@ begin
   while not WindowShouldClose do
   begin
     dt := GetFrameTime;
+    animT := animT + dt;
     BeginDrawing;
     case state of
       gsTitle: DrawTitle;
       gsCharGen: DrawCharGen;
       gsGame:
       begin
+        UpdateCamera;
         UpdateGame(dt);
         if state = gsGame then
         begin
@@ -1356,7 +1755,7 @@ begin
           end;
         end;
       end;
-      gsDeath: begin DrawWorld; DrawHUD; DrawDeath; end;
+      gsDeath: begin UpdateCamera; DrawWorld; DrawHUD; DrawDeath; end;
     end;
     // global escape
     if IsKeyPressed(KEY_F10) then TakeScreenshot('shot.png');
