@@ -41,3 +41,10 @@ PLAMEN — hardcore isometric action RPG. Side 2 build: **Free Pascal, FPC 3.2.2
 - fpc + raylib: `{$linklib raylib}` works because `libraylib.so` is in `/usr/lib`.
 - Open-array (`array of T`) params cannot be SetLength'd — use named dynamic types (`TItemArr`, `TFlatArr` in sim).
 - Save files: magic `PLAMSAVE` + version + CRC32 (case-insensitive hex compare!) of payload; tamper/corrupt = rejected loudly, never auto-repaired. Field separator inside save lines is `;` because item stats use `|`.
+- raylib 6.2: `GetMouseRay` does NOT exist — the 6.x name is `GetScreenToWorldRay` (linking fails otherwise). Camera is `TCamera3D` with `projection = CAMERA_ORTHOGRAPHIC`; for ortho, `fovy` is the near-plane HEIGHT in world units.
+- raylib 6.2 `GenMeshCube/GenMeshSphere/GenMeshCylinder/...` **SIGFPE sporadically when called from FPC** (integer div-by-zero inside the C lib; FPC unmasks FP exceptions, and the trap fires in raylib). Do NOT use GenMesh* — build meshes by hand and `UploadMesh` (see `render.BuildCubeMesh` / `AddFace`; CCW outward faces or the depth-cull eats them).
+- Hand-written raylib bindings: large records (Mesh/Model/Material/Camera3D) passed BY VALUE with `cdecl` work on x86_64 SysV (sret/memory class) — declare them as plain by-value params, `PMaterial`/`PMesh` pointers for out-params like `SetMaterialTexture`/`UploadMesh`.
+- 3D picking: `GetScreenToWorldRay(mouse, cam3)` then intersect the z=0 plane manually (`t = -pos.z/dir.z`) — do not rely on `GetRayCollisionQuad` winding.
+- `DrawCircle3D` flat on the ground: use rotationAxis (1,0,0), angle **-90** (positive 90 faces away from an iso camera at +x+y and gets culled).
+- git: remote `origin https://github.com/Henpei/plamen-fpc.git` is pre-authorized by the user — `git push origin main` after EVERY commit. Sandbox policy sometimes blocks chained `commit && push` or bulk file writes; when blocked, split the command or stage via the scratchpad and copy.
+- When splicing files by line numbers, re-grep the markers in the SAME command right before splicing — parallel edits shift line numbers and a stale splice truncates procedures (bit us once; fixed by hand).

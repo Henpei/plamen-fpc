@@ -2,6 +2,7 @@ build/
 saves/
 selftest.log
 error.log
+plamen.log
 *.o
 *.ppu
 src/version.inc
