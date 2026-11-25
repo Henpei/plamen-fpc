@@ -1,0 +1,162 @@
+================================================================================
+PLAMEN — RACE & CLASS ROSTER (data dump)
+Generated 2026-11-25T08:58:17Z directly from the data registries.
+No code changed for this dump; selftest untouched (82 passed, 0 failed, RC=0
+verified at dump time via `./build/plamen selftest`).
+================================================================================
+
+SOURCE MAP (exact files / fields / consumers)
+------------------------------------------------
+RACES
+  File:      data/races.dat  (sections `[race:<id>]`)
+  Loader:    src/reg.pas:110  F_RACES = 'data/races.dat'; parsed in
+             LoadAllData -> GRaces: array of TRace (src/reg.pas:63)
+  Record:    TRace = record id, name, desc: string; resists, flags: TStrArray;
+             end;  (src/reg.pas:20)
+  Fields:    name=            display name
+             desc=            chargen description (verbatim below)
+             resists=         '|'-separated elem=pct  (e.g. fire=25)
+             flags=           '|'-separated key=value consumed by the engine
+  Consumers: resists -> AddFlat('<elem>_res', pct) in RecalcStats
+             (src/sim.pas:322-329)
+             flags  -> FlagSet into the single quest-state flag DB
+             (src/sim.pas:431-433), then read via RaceFlag()/FlagGet:
+               store_mul          -> StorePriceMul (sim.pas:783)  [Stormcrowned 1.10]
+               swim               -> maps.IsBlocked water tiles (maps.pas:211)
+               stat_pool_bonus    -> +1 random attribute at chargen (sim.pas:454)
+               skill_point_bonus  -> +1 skill point at chargen AND per level
+                                     (sim.pas:459, sim.pas:546)
+               emberfall_rep / veil_map / regen_outdoor / fire_weak /
+               storm_weak / no_faction_elite -> stored flags; referenced by
+               dialog conditions / region logic via the flag DB (no hardcoded
+               consumer in sim for these five — they are data-driven hooks).
+
+CLASSES
+  File:      data/classes.dat  (sections `[class:<id>]`)
+  Loader:    src/reg.pas:111  F_CLASSES = 'data/classes.dat'; -> GClasses:
+             array of TClassDef (src/reg.pas:64)
+  Record:    TClassDef = record id, name, desc: string; startKit, seedSkills:
+             TStrArray; manaMul, hpMul, stamMul: Single; end;  (src/reg.pas:21)
+  Fields:    name=, desc=, start_kit= ('|'-sep `slot:itemid`),
+             seed_skills= ('|'-sep skill ids),
+             hp_mul=, mana_mul=, stam_mul= (floats, default 1.0)
+  Consumers: sim.NewPlayer (src/sim.pas:467-527):
+               start_kit items -> InvAdd + auto-equip (sim.pas:470-497)
+               seed_skills    -> appended to p.skills IF FindSkill(id) >= 0
+                                 (sim.pas:501-505)
+               starter spells -> all spells with lvl<=2 (sim.pas:507-512)
+               quickbar[0]='attack', rest = first spells (sim.pas:515-519)
+             hp_mul/mana_mul/stam_mul -> parsed at reg.pas:338-340 but
+               NOT consumed anywhere in src/ (see DATA OBSERVATIONS).
+
+================================================================================
+RACES (5) — source: data/races.dat
+================================================================================
+
+[race:ashborn]  name=Ashborn
+  desc: "Sundering-marked humans, fire-touched. The ash in their veins shrugs
+         off flame."
+  resists: fire=25            -> +25 fire_res
+  flags:   emberfall_rep=1    -> flag (Emberfall reputation hook)
+
+[race:veilkin]  name=Veilkin
+  desc: "Forest-blood. They mend slowly under open sky, and the Veil knows
+         their step."
+  resists: nature=15          -> +15 nature_res
+  flags:   veil_map=1 | regen_outdoor=1 | fire_weak=-15
+           -> flags; fire_weak=-15 is the fire weakness hook (data-driven)
+
+[race:tideborn]  name=Tideborn
+  desc: "Drowned Maren descent. They breathe water and swim like walking."
+  resists: water=25           -> +25 water_res
+  flags:   swim=1 | storm_weak=-15
+           -> swim=1 lets them walk on '~' water (maps.pas:211);
+              storm_weak=-15 is the cold weakness hook
+
+[race:stormcrowned]  name=Stormcrowned
+  desc: "Mountain aristocracy. Born to command — and to pay for it everywhere."
+  resists: storm=15           -> +15 storm_res
+  flags:   stat_pool_bonus=1 | store_mul=1.10
+           -> +1 random attribute at chargen (sim.pas:454);
+              ALL stores 10% pricier (sim.pas:783)
+
+[race:untethered]  name=Untethered
+  desc: "No bloodline. Orphans of the Order's secret experiments. Nobody knows
+         what was done to them."
+  resists: (none)
+  flags:   skill_point_bonus=1 | no_faction_elite=1
+           -> +1 skill point at chargen and +1 per level (sim.pas:459, 546);
+              no_faction_elite blocks faction-elite gear (flag hook)
+
+================================================================================
+CLASSES (6) — source: data/classes.dat
+================================================================================
+
+[class:wardancer]  name=Wardancer
+  desc: "Skill-combat duelist. Parry and riposte on timing; mobility over
+         armor. Low magic."
+  start_kit: weapon:rapier            Rapier           melee_dmg=5|crit_chance=3
+             offhand:parry_blade      Parry Blade      parry=8|block=6
+             body:duelist_leather     Duelist Leather  armor=4|dodge_chance=5|move_speed=0.2
+  seed_skills: wardancer_flourish | wardancer_footwork   (see OBSERVATIONS)
+  hp_mul=0.95  mana_mul=0.7  stam_mul=1.2   (parsed, currently unused — see below)
+
+[class:emberweaver]  name=Emberweaver
+  desc: "Elemental sorcerer of the fire/ash school. Crowd control and burning
+         ground."
+  start_kit: weapon:ember_staff   Ember Staff   spell_dmg=6|fire_res=5
+             body:ash_robe        Ash Robe      fire_res=10|spell_dmg=6|max_mana=10
+             amulet:cinder_charm  Cinder Charm  fire_res=10|element_dmg=5
+  seed_skills: emberweaver_ignite | emberweaver_heat
+  hp_mul/mana_mul/stam_mul: not set (default 1.0)
+
+[class:runeforger]  name=Runeforger
+  desc: "Craft/enchant hybrid. Enchants own gear on the go; weaker in direct
+         combat."
+  start_kit: weapon:rune_hammer  Rune Hammer   melee_dmg=7|armor=2
+             body:forger_apron   Forger Apron  armor=6|max_stamina=12|magic_find=10
+             ring1:rune_ring     Rune Ring     spirit=2|spell_dmg=3
+  seed_skills: runeforger_marks | runeforger_temper
+  mana_mul=1.1
+
+[class:shadowpact]  name=Shadowpact
+  desc: "Dot/curse caster with lifesteal. Trades health for damage — hardcore
+         synergy."
+  start_kit: weapon:pact_blade     Pact Blade      melee_dmg=6|lifesteal=2
+             body:pact_vestments   Pact Vestments  lifesteal=3|max_mana=14|void_res=8
+             amulet:hunger_icon    Hunger Icon     lifesteal=3|void_res=10
+  seed_skills: shadowpact_bleed | shadowpact_siphon
+  hp_mul=0.85  mana_mul=1.3
+
+[class:wardens_hound]  name=Warden's Hound
+  desc: "Tank. Taunt, shield-bash, partyless vanguard builds."
+  start_kit: weapon:warhammer      Warhammer       melee_dmg=9|armor=1
+             offhand:bulwark       Bulwark         block=14|armor=6|max_hp=10
+             body:vanguard_plate   Vanguard Plate  armor=12|max_hp=24|block=8
+             head:warden_helm      Warden Helm     armor=5|max_hp=12|block=5
+  seed_skills: hound_bulwark | hound_bash
+  hp_mul=1.35  mana_mul=0.6  stam_mul=1.1
+
+[class:lightbinder]  name=Lightbinder
+  desc: "Heal/buff caster. Healing is scarce and valuable by design."
+  start_kit: weapon:light_wand   Light Wand    spell_dmg=5|mana_regen=0.5
+             body:binder_robes   Binder Robes  max_mana=16|mana_regen=0.8|spirit=2
+             amulet:dawn_shard   Dawn Shard    max_mana=10|mana_regen=0.6|spirit=2
+  seed_skills: lightbinder_mend | lightbinder_ward
+  mana_mul=1.4  hp_mul=0.9
+
+(kit item names/stats resolved from data/items.dat `[item:<id>]` name/slot/stats)
+
+================================================================================
+DATA OBSERVATIONS (reported, NOT changed — this dump is read-only)
+================================================================================
+1. seed_skills ids in data/classes.dat (e.g. wardancer_flourish) do NOT exist
+   in data/skills.dat (skill ids there are generated, e.g. wardancer_t1_1).
+   sim.NewPlayer guards with FindSkill(id) >= 0 (sim.pas:501-505), so unknown
+   seeds are skipped: classes currently grant ZERO seed skills, and the skip
+   is silent (against the no-silent-fallback law). Fix later: align the ids
+   in classes.dat with real skill ids, or make NewPlayer Fatal on unknown seed.
+2. hp_mul / mana_mul / stam_mul in classes.dat are parsed (reg.pas:338-340)
+   but never read anywhere in src/ — they currently have NO effect.
+   Fix later: apply them in RecalcStats (sim.pas) or remove the fields.
+================================================================================
