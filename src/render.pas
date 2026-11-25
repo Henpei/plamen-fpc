@@ -717,7 +717,7 @@ end;
 
 procedure DrawDialog;
 var
-  i, shown, y, c: Integer;
+  i, y, c: Integer;
   line: TDlgLine;
   kv: TStrArray;
   choiceCount: Integer;
@@ -731,7 +731,6 @@ begin
     if not DialogCondOK(line.cond) then Continue;
     Text(160, y, 17, Subst(line.text), RAYWHITE);
     Inc(y, 26);
-    Inc(shown);
   end;
   // choices
   visibleChoices := nil;

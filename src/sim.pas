@@ -190,6 +190,7 @@ function ArrI2S(const a: array of Integer): TStrArray;
 var
   i: Integer;
 begin
+  Result := nil;
   SetLength(Result, Length(a));
   for i := 0 to High(a) do Result[i] := I2S(a[i]);
 end;
