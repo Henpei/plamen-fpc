@@ -132,6 +132,11 @@ begin
   Result.r := r; Result.g := g; Result.b := b; Result.a := 255;
 end;
 
+function MkColA(r, g, b, a: Integer): TColor;
+begin
+  Result.r := r; Result.g := g; Result.b := b; Result.a := a;
+end;
+
 function MkRec(x, y, w, h: Single): TRectangle;
 begin
   Result.x := x; Result.y := y; Result.width := w; Result.height := h;
@@ -154,33 +159,55 @@ begin
 end;
 
 
-{ ---------------- world — TRUE 3D renderer ----------------
-  Fixed-angle orthographic 3D camera (classic 2:1 dimetric: elevation atan(1/2),
-  azimuth 45 deg) via raylib BeginMode3D. Real 3D geometry: one hand-built unit
-  cube mesh (CCW faces, uploaded with UploadMesh — raylib 6.2's GenMesh* SIGFPE'd
-  sporadically from Pascal, so no GenMesh* is used) scaled/rotated per draw call
-  with textured materials (procedurally generated textures, deterministic seed;
-  CC0 download was blocked by sandbox policy — see README). Props: extruded wall
-  boxes, trunk boxes, canopy boxes, portal columns, water slabs. Characters are
-  camera-facing billboards with generated silhouette textures. Depth buffer
-  handles occlusion. 2D pass after EndMode3D draws labels/HP bars. }
+{ ---------------- world — v3: stylized low-poly 3D ARPG renderer ----------------
+  Fully 3D, textured, LIT with a real shadow map. Fixed-angle orthographic camera
+  (default classic 2:1 dimetric; zoom 3 steps via wheel/PgUp/PgDn/+/-; tilt toggle T).
+  Terrain = per-tile height field (plateaus, cliffs with extruded box faces, ramps at
+  transitions, water channels). Props = trunk+canopy trees, rocks, portal columns.
+  Characters = primitive-mesh rigs (legs/torso/head/arms/weapon), NO billboards;
+  walk cycle, attack swing, idle bob, death fall; per-class body plans for the player.
+  Telegraphs/click markers = additive glow decals (soft radial texture). Damage
+  numbers stay world-to-screen above heads. Boundary: this unit is the ONLY game
+  code touching raylib besides plamen.dpr; sim/reg/data/maps/selftest untouched. }
 
 const
   CAM_DIST = 26.0;
-  CAM_FOVY = 23.0;   // ortho near-plane height in world units (~23 tiles vertical)
+  CAM_FOVY = 20.0;          // base ortho height (world units) at zoom level 0
   NTILESETS = 6;
+  SHADOW_SIZE = 1024;
+  SUN_DIR: array[0..2] of Single = (0.45, 0.45, 0.76); // direction TO the sun (normalized at init)
 
 type
   TMoveMark = record x, y, t: Single; end;
+  TFx = record phase, atk, dead, seed: Single; lastState: Integer; end;
+  PFx = ^TFx;
+  TBodyPlan = record scale, shoulder, torsoH, weapLen: Single; helm, robe: Boolean; end;
 
 var
   cam3: TCamera3D;
+  lightCam3: TCamera3D;
   animT: Single = 0;
+  lastAnimT: Single = 0;
   texRnd: UInt64 = 88172645463325252;
-  gCube: TMesh;
+  zoomLevel: Integer = 0;
+  tiltOn: Boolean = False;
+  curFovy: Single = CAM_FOVY;
+  // meshes
+  gCube, gSphere, gCyl, gQuad: TMesh;
+  // materials (all use gLitShader in the main pass)
   gFloorMat, gWallMat: array[0..NTILESETS-1] of TMaterial;
   gMatRock, gMatTrunk, gMatCanopy, gMatWater, gMatPortal, gMatUnder: TMaterial;
-  billCache: array of record key: string; tex: TTexture2D; end;
+  gMatBody, gMatSkin, gMatWeapon, gMatTrim, gMatGlow: TMaterial;
+  // shaders + shadow map
+  gLitShader, gDepthShader: TShader;
+  locLightDir, locLightColor, locAmbient, locViewPos, locShadowVP, locShadowMap: Integer;
+  shadowRT: TRenderTexture2D;
+  shadowVP: TMatrix;
+  sunDir: TVector3;
+  // per-entity anim state (render-side only)
+  entFx: array of TFx;
+  pFxPhase, pFxAtk, pFxDead: Single;
+  lastPX, lastPY: Single;
   moveMarks: array of TMoveMark;
   lastMX, lastMY: Single;
   hoverEnt: Integer = -1;
@@ -194,6 +221,7 @@ var
   kbSel: Integer = 0;
   kbList: array of Integer;
   stuckX, stuckY, stuckT: Single;
+  gActiveShader: TShader;
 
 function ElemCol(const elem: string): TColor; forward;
 function HasQuestFor(const npcId: string): Boolean; forward;
@@ -211,6 +239,22 @@ begin
   Result.x := x; Result.y := y; Result.z := z;
 end;
 
+function V3Norm(v: TVector3): TVector3;
+var
+  l: Single;
+begin
+  l := Sqrt(v.x * v.x + v.y * v.y + v.z * v.z);
+  if l < 1e-9 then l := 1;
+  Result.x := v.x / l; Result.y := v.y / l; Result.z := v.z / l;
+end;
+
+function V3Cross(a, b: TVector3): TVector3;
+begin
+  Result.x := a.y * b.z - a.z * b.y;
+  Result.y := a.z * b.x - a.x * b.z;
+  Result.z := a.x * b.y - a.y * b.x;
+end;
+
 function TilesetIdx(const ts: string): Integer;
 begin
   if ts = 'emberfall' then Result := 0
@@ -218,65 +262,10 @@ begin
   else if ts = 'glass' then Result := 2
   else if ts = 'maren' then Result := 3
   else if ts = 'crown' then Result := 4
-  else Result := 5; // world
+  else Result := 5;
 end;
 
-{ ----- hand-built unit cube mesh (centered origin, side 1, CCW outward faces) ----- }
-
-procedure AddFace(var verts, norms: array of Single; var uvs: array of Single;
-  var idx: array of Word; var nv, ni: Integer;
-  const a, b, c, d: TVector3; const n: TVector3);
-var
-  base: Integer;
-begin
-  base := nv;
-  verts[nv * 3] := a.x; verts[nv * 3 + 1] := a.y; verts[nv * 3 + 2] := a.z; Inc(nv);
-  verts[nv * 3] := b.x; verts[nv * 3 + 1] := b.y; verts[nv * 3 + 2] := b.z; Inc(nv);
-  verts[nv * 3] := c.x; verts[nv * 3 + 1] := c.y; verts[nv * 3 + 2] := c.z; Inc(nv);
-  verts[nv * 3] := d.x; verts[nv * 3 + 1] := d.y; verts[nv * 3 + 2] := d.z; Inc(nv);
-  norms[base * 3] := n.x; norms[base * 3 + 1] := n.y; norms[base * 3 + 2] := n.z;
-  norms[(base + 1) * 3] := n.x; norms[(base + 1) * 3 + 1] := n.y; norms[(base + 1) * 3 + 2] := n.z;
-  norms[(base + 2) * 3] := n.x; norms[(base + 2) * 3 + 1] := n.y; norms[(base + 2) * 3 + 2] := n.z;
-  norms[(base + 3) * 3] := n.x; norms[(base + 3) * 3 + 1] := n.y; norms[(base + 3) * 3 + 2] := n.z;
-  uvs[base * 2] := 0; uvs[base * 2 + 1] := 0;
-  uvs[(base + 1) * 2] := 1; uvs[(base + 1) * 2 + 1] := 0;
-  uvs[(base + 2) * 2] := 1; uvs[(base + 2) * 2 + 1] := 1;
-  uvs[(base + 3) * 2] := 0; uvs[(base + 3) * 2 + 1] := 1;
-  idx[ni] := base; idx[ni + 1] := base + 1; idx[ni + 2] := base + 2;
-  idx[ni + 3] := base; idx[ni + 4] := base + 2; idx[ni + 5] := base + 3;
-  ni := ni + 6;
-end;
-
-procedure BuildCubeMesh;
-var
-  verts, norms: array[0..71] of Single;
-  uvs: array[0..47] of Single;
-  idx: array[0..35] of Word;
-  nv, ni: Integer;
-begin
-  nv := 0; ni := 0;
-  AddFace(verts, norms, uvs, idx, nv, ni, V3(0.5, -0.5, 0.5), V3(0.5, -0.5, -0.5), V3(0.5, 0.5, -0.5), V3(0.5, 0.5, 0.5), V3(1, 0, 0));
-  AddFace(verts, norms, uvs, idx, nv, ni, V3(-0.5, -0.5, -0.5), V3(-0.5, -0.5, 0.5), V3(-0.5, 0.5, 0.5), V3(-0.5, 0.5, -0.5), V3(-1, 0, 0));
-  AddFace(verts, norms, uvs, idx, nv, ni, V3(-0.5, 0.5, 0.5), V3(0.5, 0.5, 0.5), V3(0.5, 0.5, -0.5), V3(-0.5, 0.5, -0.5), V3(0, 1, 0));
-  AddFace(verts, norms, uvs, idx, nv, ni, V3(-0.5, -0.5, -0.5), V3(0.5, -0.5, -0.5), V3(0.5, -0.5, 0.5), V3(-0.5, -0.5, 0.5), V3(0, -1, 0));
-  AddFace(verts, norms, uvs, idx, nv, ni, V3(-0.5, -0.5, 0.5), V3(0.5, -0.5, 0.5), V3(0.5, 0.5, 0.5), V3(-0.5, 0.5, 0.5), V3(0, 0, 1));
-  AddFace(verts, norms, uvs, idx, nv, ni, V3(-0.5, -0.5, -0.5), V3(-0.5, 0.5, -0.5), V3(0.5, 0.5, -0.5), V3(0.5, -0.5, -0.5), V3(0, 0, -1));
-  gCube := Default(TMesh);
-  gCube.vertexCount := 24;
-  gCube.triangleCount := 12;
-  gCube.vertices := GetMem(24 * 3 * SizeOf(Single));
-  gCube.normals := GetMem(24 * 3 * SizeOf(Single));
-  gCube.texcoords := GetMem(24 * 2 * SizeOf(Single));
-  gCube.indices := GetMem(36 * SizeOf(Word));
-  Move(verts[0], gCube.vertices^, 24 * 3 * SizeOf(Single));
-  Move(norms[0], gCube.normals^, 24 * 3 * SizeOf(Single));
-  Move(uvs[0], gCube.texcoords^, 24 * 2 * SizeOf(Single));
-  Move(idx[0], gCube.indices^, 36 * SizeOf(Word));
-  UploadMesh(gCube, False);
-  Log('cube mesh uploaded: 24 verts, 12 tris');
-end;
-
-{ ----- procedural textures (deterministic, local xorshift — game RNG untouched) ----- }
+{ ================= procedural textures ================= }
 
 function FinishTex(img: TImage): TTexture2D;
 begin
@@ -295,7 +284,7 @@ begin
     begin
       n := Integer(NextRnd mod 100);
       if n < pDark then
-        ImageDrawPixel(@img, x, y, dark)
+        ImageDrawPixel(@img, x, y, Fade(dark, 0.55))
       else if n < pDark + pLight then
       begin
         n := Integer(NextRnd mod 20) - 10;
@@ -309,7 +298,7 @@ var
   img: TImage;
 begin
   img := GenImageColor(64, 64, base);
-  NoisePass(img, 64, 64, MkCol(0, 0, 0), speck, 22, 7);
+  NoisePass(img, 64, 64, MkCol(0, 0, 0), speck, 9, 4);
   Result := FinishTex(img);
 end;
 
@@ -401,126 +390,384 @@ begin
   Result := FinishTex(img);
 end;
 
-{ ----- billboard (entity) textures, cached by key ----- }
-
-function BillTex(const key: string; kind: TEntKind; body: TColor; boss: Boolean): TTexture2D;
+function GenTexCloth(base: TColor): TTexture2D;
 var
-  i, cx, cy, r: Integer;
   img: TImage;
 begin
-  for i := 0 to High(billCache) do
-    if billCache[i].key = key then Exit(billCache[i].tex);
+  img := GenImageColor(64, 64, base);
+  NoisePass(img, 64, 64, MkCol(ClampI(base.r - 30, 0, 255), ClampI(base.g - 30, 0, 255), ClampI(base.b - 30, 0, 255)),
+    MkCol(ClampI(base.r + 25, 0, 255), ClampI(base.g + 25, 0, 255), ClampI(base.b + 25, 0, 255)), 14, 8);
+  Result := FinishTex(img);
+end;
+
+// soft radial glow for additive decals (white center -> transparent edge)
+function GenTexGlow: TTexture2D;
+var
+  img: TImage;
+  x, y: Integer;
+  dx, dy, d: Single;
+  a: Byte;
+begin
   img := GenImageColor(64, 64, BLANK);
-  cx := 32; cy := 34;
-  case kind of
-    ekMonster:
+  for y := 0 to 63 do
+    for x := 0 to 63 do
     begin
-      if boss then r := 24 else r := 17;
-      ImageDrawCircleV(@img, MkV(cx, cy), r, body);
-      ImageDrawCircleLinesV(@img, MkV(cx, cy), r, MkCol(16, 12, 16));
-      ImageDrawCircleV(@img, MkV(cx - 6, cy - 4), 3, WHITE);
-      ImageDrawCircleV(@img, MkV(cx + 6, cy - 4), 3, WHITE);
-      ImageDrawCircleV(@img, MkV(cx - 6, cy - 4), 1, BLACK);
-      ImageDrawCircleV(@img, MkV(cx + 6, cy - 4), 1, BLACK);
-      if boss then
+      dx := x - 31.5; dy := y - 31.5;
+      d := Sqrt(dx * dx + dy * dy) / 31.5;
+      if d < 1.0 then
       begin
-        ImageDrawTriangle(@img, MkV(cx - r + 2, cy - 8), MkV(cx - r - 9, cy - 20), MkV(cx - r + 10, cy - 16), body);
-        ImageDrawTriangle(@img, MkV(cx + r - 2, cy - 8), MkV(cx + r + 9, cy - 20), MkV(cx + r - 10, cy - 16), body);
+        a := Round(255 * (1.0 - d) * (1.0 - d));
+        ImageDrawPixel(@img, x, y, MkColA(255, 255, 255, a));
       end;
     end;
-    ekNpc:
-    begin
-      ImageDrawRectangle(@img, cx - 10, cy + 2, 20, 22, MkCol(30, 110, 50));
-      ImageDrawCircleV(@img, MkV(cx, cy - 6), 9, MkCol(240, 210, 170));
-      ImageDrawCircleLinesV(@img, MkV(cx, cy - 6), 9, MkCol(20, 40, 24));
-    end;
-    ekChest:
-    begin
-      ImageDrawRectangle(@img, cx - 16, cy - 10, 32, 24, MkCol(110, 80, 46));
-      ImageDrawRectangleLines(@img, cx - 16, cy - 10, 32, 24, GOLD);
-      ImageDrawRectangle(@img, cx - 2, cy - 10, 4, 24, GOLD);
-    end;
-    ekLore:
-    begin
-      ImageDrawRectangle(@img, cx - 12, cy - 14, 24, 30, MkCol(232, 226, 205));
-      ImageDrawRectangleLines(@img, cx - 12, cy - 14, 24, 30, MkCol(90, 80, 60));
-      for i := 0 to 4 do
-        ImageDrawLine(@img, cx - 8, cy - 8 + i * 5, cx + 8, cy - 8 + i * 5, MkCol(120, 110, 90));
-    end;
-    ekMarker:
-    begin
-      ImageDrawTriangle(@img, MkV(cx, cy - 16), MkV(cx - 12, cy), MkV(cx + 12, cy), GOLD);
-      ImageDrawTriangle(@img, MkV(cx, cy + 16), MkV(cx - 12, cy), MkV(cx + 12, cy), MkCol(200, 150, 0));
-    end;
-    ekStore:
-    begin
-      ImageDrawCircleV(@img, MkV(cx, cy), 15, GOLD);
-      ImageDrawCircleLinesV(@img, MkV(cx, cy), 15, MkCol(140, 100, 0));
-      ImageDrawCircleV(@img, MkV(cx, cy), 7, MkCol(255, 230, 120));
-    end;
-    ekCorpse:
-    begin
-      ImageDrawCircleV(@img, MkV(cx, cy), 14, DARKGRAY);
-      ImageDrawLine(@img, cx - 8, cy - 8, cx + 8, cy + 8, BLACK);
-      ImageDrawLine(@img, cx + 8, cy - 8, cx - 8, cy + 8, BLACK);
-    end;
-  else
-    ImageDrawCircleV(@img, MkV(cx, cy), 12, body);
-  end;
-  if key = 'player' then
-  begin
-    ImageDrawCircleV(@img, MkV(cx, cy), 15, SKYBLUE);
-    ImageDrawCircleLinesV(@img, MkV(cx, cy), 15, WHITE);
-    ImageDrawLine(@img, cx + 8, cy + 12, cx + 22, cy - 6, WHITE);
-    ImageDrawLine(@img, cx + 10, cy + 14, cx + 24, cy - 4, WHITE);
-  end;
   Result := LoadTextureFromImage(img);
   SetTextureFilter(Result, TEXTURE_FILTER_BILINEAR);
   UnloadImage(img);
-  SetLength(billCache, Length(billCache) + 1);
-  billCache[High(billCache)].key := key;
-  billCache[High(billCache)].tex := Result;
 end;
 
-function EntTexFor(const e: TEnt): TTexture2D;
+{ ================= hand-built meshes (no GenMesh* — see AGENTS.md) ================= }
+
+procedure AddFace(var verts, norms: array of Single; var uvs: array of Single;
+  var idx: array of Word; var nv, ni: Integer;
+  const a, b, c, d: TVector3; const n: TVector3);
 var
-  key: string;
-  body: TColor;
+  base: Integer;
 begin
-  body := RED;
-  case e.kind of
-    ekMonster: begin key := 'mon:' + e.id; if e.element <> '' then body := ElemCol(e.element); end;
-    ekNpc: begin key := 'npc'; body := GREEN; end;
-    ekChest: key := 'chest';
-    ekLore: key := 'lore';
-    ekMarker: key := 'marker';
-    ekStore: key := 'store';
-    ekCorpse: key := 'corpse';
-  else key := 'misc'; body := GRAY;
-  end;
-  Result := BillTex(key, e.kind, body, e.boss);
+  base := nv;
+  verts[nv * 3] := a.x; verts[nv * 3 + 1] := a.y; verts[nv * 3 + 2] := a.z; Inc(nv);
+  verts[nv * 3] := b.x; verts[nv * 3 + 1] := b.y; verts[nv * 3 + 2] := b.z; Inc(nv);
+  verts[nv * 3] := c.x; verts[nv * 3 + 1] := c.y; verts[nv * 3 + 2] := c.z; Inc(nv);
+  verts[nv * 3] := d.x; verts[nv * 3 + 1] := d.y; verts[nv * 3 + 2] := d.z; Inc(nv);
+  norms[base * 3] := n.x; norms[base * 3 + 1] := n.y; norms[base * 3 + 2] := n.z;
+  norms[(base + 1) * 3] := n.x; norms[(base + 1) * 3 + 1] := n.y; norms[(base + 1) * 3 + 2] := n.z;
+  norms[(base + 2) * 3] := n.x; norms[(base + 2) * 3 + 1] := n.y; norms[(base + 2) * 3 + 2] := n.z;
+  norms[(base + 3) * 3] := n.x; norms[(base + 3) * 3 + 1] := n.y; norms[(base + 3) * 3 + 2] := n.z;
+  uvs[base * 2] := 0; uvs[base * 2 + 1] := 0;
+  uvs[(base + 1) * 2] := 1; uvs[(base + 1) * 2 + 1] := 0;
+  uvs[(base + 2) * 2] := 1; uvs[(base + 2) * 2 + 1] := 1;
+  uvs[(base + 3) * 2] := 0; uvs[(base + 3) * 2 + 1] := 1;
+  idx[ni] := base; idx[ni + 1] := base + 1; idx[ni + 2] := base + 2;
+  idx[ni + 3] := base; idx[ni + 4] := base + 2; idx[ni + 5] := base + 3;
+  ni := ni + 6;
 end;
 
-{ ----- assets ----- }
+procedure BuildCubeMesh;
+var
+  verts, norms: array[0..71] of Single;
+  uvs: array[0..47] of Single;
+  idx: array[0..35] of Word;
+  nv, ni: Integer;
+begin
+  nv := 0; ni := 0;
+  AddFace(verts, norms, uvs, idx, nv, ni, V3(0.5, -0.5, 0.5), V3(0.5, -0.5, -0.5), V3(0.5, 0.5, -0.5), V3(0.5, 0.5, 0.5), V3(1, 0, 0));
+  AddFace(verts, norms, uvs, idx, nv, ni, V3(-0.5, -0.5, -0.5), V3(-0.5, -0.5, 0.5), V3(-0.5, 0.5, 0.5), V3(-0.5, 0.5, -0.5), V3(-1, 0, 0));
+  AddFace(verts, norms, uvs, idx, nv, ni, V3(-0.5, 0.5, 0.5), V3(0.5, 0.5, 0.5), V3(0.5, 0.5, -0.5), V3(-0.5, 0.5, -0.5), V3(0, 1, 0));
+  AddFace(verts, norms, uvs, idx, nv, ni, V3(-0.5, -0.5, -0.5), V3(0.5, -0.5, -0.5), V3(0.5, -0.5, 0.5), V3(-0.5, -0.5, 0.5), V3(0, -1, 0));
+  AddFace(verts, norms, uvs, idx, nv, ni, V3(-0.5, -0.5, 0.5), V3(0.5, -0.5, 0.5), V3(0.5, 0.5, 0.5), V3(-0.5, 0.5, 0.5), V3(0, 0, 1));
+  AddFace(verts, norms, uvs, idx, nv, ni, V3(-0.5, -0.5, -0.5), V3(-0.5, 0.5, -0.5), V3(0.5, 0.5, -0.5), V3(0.5, -0.5, -0.5), V3(0, 0, -1));
+  gCube := Default(TMesh);
+  gCube.vertexCount := 24;
+  gCube.triangleCount := 12;
+  gCube.vertices := GetMem(24 * 3 * SizeOf(Single));
+  gCube.normals := GetMem(24 * 3 * SizeOf(Single));
+  gCube.texcoords := GetMem(24 * 2 * SizeOf(Single));
+  gCube.indices := GetMem(36 * SizeOf(Word));
+  Move(verts[0], gCube.vertices^, 24 * 3 * SizeOf(Single));
+  Move(norms[0], gCube.normals^, 24 * 3 * SizeOf(Single));
+  Move(uvs[0], gCube.texcoords^, 24 * 2 * SizeOf(Single));
+  Move(idx[0], gCube.indices^, 36 * SizeOf(Word));
+  UploadMesh(gCube, False);
+end;
+
+// low-poly sphere (radius r, rings x slices), centered origin
+procedure BuildSphereMesh(r: Single; rings, slices: Integer);
+var
+  verts, norms, uvs: array of Single;
+  idx: array of Word;
+  i, j, nv, ni: Integer;
+  phi0, phi1, th0, th1: Single;
+  v00, v01, v10, v11: TVector3;
+  function SV(phi, th: Single): TVector3;
+  begin
+    Result.x := r * Sin(phi) * Cos(th);
+    Result.y := r * Sin(phi) * Sin(th);
+    Result.z := r * Cos(phi);
+  end;
+  procedure PushV(v: TVector3; u, vv: Single);
+  begin
+    SetLength(verts, Length(verts) + 3);
+    verts[High(verts) - 2] := v.x; verts[High(verts) - 1] := v.y; verts[High(verts)] := v.z;
+    SetLength(norms, Length(norms) + 3);
+    norms[High(norms) - 2] := v.x / r; norms[High(norms) - 1] := v.y / r; norms[High(norms)] := v.z / r;
+    SetLength(uvs, Length(uvs) + 2);
+    uvs[High(uvs) - 1] := u; uvs[High(uvs)] := vv;
+    Inc(nv);
+  end;
+  procedure PushT(a, b, c: Integer);
+  begin
+    SetLength(idx, Length(idx) + 3);
+    idx[High(idx) - 2] := a; idx[High(idx) - 1] := b; idx[High(idx)] := c;
+    ni := ni + 3;
+  end;
+begin
+  verts := nil; norms := nil; uvs := nil; idx := nil;
+  nv := 0; ni := 0;
+  for i := 0 to rings - 1 do
+  begin
+    phi0 := Pi * i / rings;
+    phi1 := Pi * (i + 1) / rings;
+    for j := 0 to slices - 1 do
+    begin
+      th0 := 2 * Pi * j / slices;
+      th1 := 2 * Pi * (j + 1) / slices;
+      v00 := SV(phi0, th0); v01 := SV(phi0, th1);
+      v10 := SV(phi1, th0); v11 := SV(phi1, th1);
+      if i > 0 then
+      begin
+        PushV(v00, j / slices, i / rings); PushV(v10, j / slices, (i + 1) / rings);
+        PushV(v11, (j + 1) / slices, (i + 1) / rings);
+        PushT(nv - 3, nv - 2, nv - 1);
+      end;
+      if i < rings - 1 then
+      begin
+        PushV(v00, j / slices, i / rings); PushV(v11, (j + 1) / slices, (i + 1) / rings);
+        PushV(v01, (j + 1) / slices, i / rings);
+        PushT(nv - 3, nv - 2, nv - 1);
+      end;
+    end;
+  end;
+  gSphere := Default(TMesh);
+  gSphere.vertexCount := nv;
+  gSphere.triangleCount := ni div 3;
+  gSphere.vertices := GetMem(nv * 3 * SizeOf(Single));
+  gSphere.normals := GetMem(nv * 3 * SizeOf(Single));
+  gSphere.texcoords := GetMem(nv * 2 * SizeOf(Single));
+  gSphere.indices := GetMem(ni * SizeOf(Word));
+  if nv > 0 then
+  begin
+    Move(verts[0], gSphere.vertices^, nv * 3 * SizeOf(Single));
+    Move(norms[0], gSphere.normals^, nv * 3 * SizeOf(Single));
+    Move(uvs[0], gSphere.texcoords^, nv * 2 * SizeOf(Single));
+    Move(idx[0], gSphere.indices^, ni * SizeOf(Word));
+  end;
+  UploadMesh(gSphere, False);
+end;
+
+// cylinder along Z (z-up world), radius r, height h, centered origin
+procedure BuildCylMesh(r, h: Single; slices: Integer);
+var
+  verts, norms, uvs: array of Single;
+  idx: array of Word;
+  j, nv, ni: Integer;
+  th0, th1: Single;
+  procedure PushV(x, y, z, nx, ny, nz, u, vv: Single);
+  begin
+    SetLength(verts, Length(verts) + 3);
+    verts[High(verts) - 2] := x; verts[High(verts) - 1] := y; verts[High(verts)] := z;
+    SetLength(norms, Length(norms) + 3);
+    norms[High(norms) - 2] := nx; norms[High(norms) - 1] := ny; norms[High(norms)] := nz;
+    SetLength(uvs, Length(uvs) + 2);
+    uvs[High(uvs) - 1] := u; uvs[High(uvs)] := vv;
+    Inc(nv);
+  end;
+  procedure PushT(a, b, c: Integer);
+  begin
+    SetLength(idx, Length(idx) + 3);
+    idx[High(idx) - 2] := a; idx[High(idx) - 1] := b; idx[High(idx)] := c;
+    ni := ni + 3;
+  end;
+begin
+  verts := nil; norms := nil; uvs := nil; idx := nil;
+  nv := 0; ni := 0;
+  for j := 0 to slices - 1 do
+  begin
+    th0 := 2 * Pi * j / slices;
+    th1 := 2 * Pi * (j + 1) / slices;
+    // side quad
+    PushV(r * Cos(th0), r * Sin(th0), -h / 2, Cos(th0), Sin(th0), 0, j / slices, 0);
+    PushV(r * Cos(th1), r * Sin(th1), -h / 2, Cos(th1), Sin(th1), 0, (j + 1) / slices, 0);
+    PushV(r * Cos(th1), r * Sin(th1), h / 2, Cos(th1), Sin(th1), 0, (j + 1) / slices, 1);
+    PushV(r * Cos(th0), r * Sin(th0), h / 2, Cos(th0), Sin(th0), 0, j / slices, 1);
+    PushT(nv - 4, nv - 3, nv - 2); PushT(nv - 4, nv - 2, nv - 1);
+    // top cap
+    PushV(0, 0, h / 2, 0, 0, 1, 0.5, 0.5);
+    PushV(r * Cos(th0), r * Sin(th0), h / 2, 0, 0, 1, 0.5 + 0.5 * Cos(th0), 0.5 + 0.5 * Sin(th0));
+    PushV(r * Cos(th1), r * Sin(th1), h / 2, 0, 0, 1, 0.5 + 0.5 * Cos(th1), 0.5 + 0.5 * Sin(th1));
+    PushT(nv - 3, nv - 2, nv - 1);
+    // bottom cap
+    PushV(0, 0, -h / 2, 0, 0, -1, 0.5, 0.5);
+    PushV(r * Cos(th1), r * Sin(th1), -h / 2, 0, 0, -1, 0.5 + 0.5 * Cos(th1), 0.5 + 0.5 * Sin(th1));
+    PushV(r * Cos(th0), r * Sin(th0), -h / 2, 0, 0, -1, 0.5 + 0.5 * Cos(th0), 0.5 + 0.5 * Sin(th0));
+    PushT(nv - 3, nv - 2, nv - 1);
+  end;
+  gCyl := Default(TMesh);
+  gCyl.vertexCount := nv;
+  gCyl.triangleCount := ni div 3;
+  gCyl.vertices := GetMem(nv * 3 * SizeOf(Single));
+  gCyl.normals := GetMem(nv * 3 * SizeOf(Single));
+  gCyl.texcoords := GetMem(nv * 2 * SizeOf(Single));
+  gCyl.indices := GetMem(ni * SizeOf(Word));
+  if nv > 0 then
+  begin
+    Move(verts[0], gCyl.vertices^, nv * 3 * SizeOf(Single));
+    Move(norms[0], gCyl.normals^, nv * 3 * SizeOf(Single));
+    Move(uvs[0], gCyl.texcoords^, nv * 2 * SizeOf(Single));
+    Move(idx[0], gCyl.indices^, ni * SizeOf(Word));
+  end;
+  UploadMesh(gCyl, False);
+end;
+
+// flat 1x1 quad in XZ plane at z=0 (for glow decals)
+procedure BuildQuadMesh;
+var
+  verts, norms: array[0..11] of Single;
+  uvs: array[0..7] of Single;
+  idx: array[0..5] of Word;
+begin
+  verts[0] := -0.5; verts[1] := -0.5; verts[2] := 0;
+  verts[3] := 0.5;  verts[4] := -0.5; verts[5] := 0;
+  verts[6] := 0.5;  verts[7] := 0.5;  verts[8] := 0;
+  verts[9] := -0.5; verts[10] := 0.5; verts[11] := 0;
+  norms[0] := 0; norms[1] := 0; norms[2] := 1;
+  norms[3] := 0; norms[4] := 0; norms[5] := 1;
+  norms[6] := 0; norms[7] := 0; norms[8] := 1;
+  norms[9] := 0; norms[10] := 0; norms[11] := 1;
+  uvs[0] := 0; uvs[1] := 0; uvs[2] := 1; uvs[3] := 0; uvs[4] := 1; uvs[5] := 1; uvs[6] := 0; uvs[7] := 1;
+  idx[0] := 0; idx[1] := 1; idx[2] := 2; idx[3] := 0; idx[4] := 2; idx[5] := 3;
+  gQuad := Default(TMesh);
+  gQuad.vertexCount := 4;
+  gQuad.triangleCount := 2;
+  gQuad.vertices := GetMem(12 * SizeOf(Single));
+  gQuad.normals := GetMem(12 * SizeOf(Single));
+  gQuad.texcoords := GetMem(8 * SizeOf(Single));
+  gQuad.indices := GetMem(6 * SizeOf(Word));
+  Move(verts[0], gQuad.vertices^, 12 * SizeOf(Single));
+  Move(norms[0], gQuad.normals^, 12 * SizeOf(Single));
+  Move(uvs[0], gQuad.texcoords^, 8 * SizeOf(Single));
+  Move(idx[0], gQuad.indices^, 6 * SizeOf(Word));
+  UploadMesh(gQuad, False);
+end;
+
+{ ================= shaders ================= }
+
+const
+  LIT_VS: string =
+    '#version 330' + #10 +
+    'in vec3 vertexPosition;' + #10 +
+    'in vec2 vertexTexCoord;' + #10 +
+    'in vec3 vertexNormal;' + #10 +
+    'uniform mat4 mvp;' + #10 +
+    'uniform mat4 matModel;' + #10 +
+    'uniform mat4 shadowVP;' + #10 +
+    'out vec2 vUv;' + #10 +
+    'out vec3 vN;' + #10 +
+    'out vec3 vW;' + #10 +
+    'out vec4 vSh;' + #10 +
+    'void main(){' + #10 +
+    '  vec4 w = matModel * vec4(vertexPosition, 1.0);' + #10 +
+    '  vW = w.xyz;' + #10 +
+    '  vUv = vertexTexCoord;' + #10 +
+    '  vN = normalize(mat3(matModel) * vertexNormal);' + #10 +
+    '  vSh = shadowVP * w;' + #10 +
+    '  gl_Position = mvp * vec4(vertexPosition, 1.0);' + #10 +
+    '}';
+
+  LIT_FS: string =
+    '#version 330' + #10 +
+    'in vec2 vUv;' + #10 +
+    'in vec3 vN;' + #10 +
+    'in vec3 vW;' + #10 +
+    'in vec4 vSh;' + #10 +
+    'uniform sampler2D texture0;' + #10 +
+    'uniform vec4 colDiffuse;' + #10 +
+    'uniform vec3 lightDir;' + #10 +
+    'uniform vec3 lightColor;' + #10 +
+    'uniform vec3 ambient;' + #10 +
+    'uniform vec3 viewPos;' + #10 +
+    'uniform sampler2D shadowMap;' + #10 +
+    'out vec4 fragColor;' + #10 +
+    'void main(){' + #10 +
+    '  vec4 alb = texture(texture0, vUv) * colDiffuse;' + #10 +
+    '  if (alb.a < 0.04) discard;' + #10 +
+    '  vec3 N = normalize(vN);' + #10 +
+    '  vec3 L = normalize(lightDir);' + #10 +
+    '  float diff = max(dot(N, L), 0.0);' + #10 +
+    '  float shadow = 1.0;' + #10 +
+    '  vec3 sc = vSh.xyz / vSh.w * 0.5 + 0.5;' + #10 +
+    '  if (sc.x >= 0.0 && sc.x <= 1.0 && sc.y >= 0.0 && sc.y <= 1.0 && sc.z <= 1.0) {' + #10 +
+    '    vec4 s = texture(shadowMap, sc.xy);' + #10 +
+    '    float d = s.r + s.g / 256.0 + s.b / 65536.0;' + #10 +
+    '    float bias = 0.0028 + 0.008 * (1.0 - diff);' + #10 +
+    '    if (sc.z - bias > d) shadow = 0.34;' + #10 +
+    '  }' + #10 +
+    '  vec3 V = normalize(viewPos - vW);' + #10 +
+    '  vec3 H = normalize(L + V);' + #10 +
+    '  float spec = pow(max(dot(N, H), 0.0), 24.0) * 0.18;' + #10 +
+    '  vec3 col = alb.rgb * (ambient + lightColor * diff * shadow) + lightColor * spec * shadow;' + #10 +
+    '  fragColor = vec4(col, alb.a);' + #10 +
+    '}';
+
+  DEPTH_VS: string =
+    '#version 330' + #10 +
+    'in vec3 vertexPosition;' + #10 +
+    'uniform mat4 mvp;' + #10 +
+    'void main(){ gl_Position = mvp * vec4(vertexPosition, 1.0); }';
+
+  DEPTH_FS: string =
+    '#version 330' + #10 +
+    'out vec4 fragColor;' + #10 +
+    'void main(){' + #10 +
+    '  float d = gl_FragCoord.z;' + #10 +
+    '  fragColor = vec4(d, fract(d * 256.0), fract(d * 65536.0), 1.0);' + #10 +
+    '}';
+
+procedure InitShaders;
+begin
+  gLitShader := LoadShaderFromMemory(PAnsiChar(LIT_VS), PAnsiChar(LIT_FS));
+  gDepthShader := LoadShaderFromMemory(PAnsiChar(DEPTH_VS), PAnsiChar(DEPTH_FS));
+  if (gLitShader.id = 0) or (gDepthShader.id = 0) then
+    Fatal('shader compile failed (lit/depth) — loud, no fallback');
+  locLightDir := GetShaderLocation(gLitShader, 'lightDir');
+  locLightColor := GetShaderLocation(gLitShader, 'lightColor');
+  locAmbient := GetShaderLocation(gLitShader, 'ambient');
+  locViewPos := GetShaderLocation(gLitShader, 'viewPos');
+  locShadowVP := GetShaderLocation(gLitShader, 'shadowVP');
+  locShadowMap := GetShaderLocation(gLitShader, 'shadowMap');
+  shadowRT := LoadRenderTexture(SHADOW_SIZE, SHADOW_SIZE);
+  sunDir := V3Norm(V3(SUN_DIR[0], SUN_DIR[1], SUN_DIR[2]));
+  Log('shaders ready: lit(dir+ambient+shadowmap) + depth-encode, shadowRT ' + I2S(SHADOW_SIZE));
+end;
+
+{ ================= materials / assets ================= }
 
 function NewMat(tex: TTexture2D; tint: TColor): TMaterial;
 begin
   Result := LoadMaterialDefault;
+  Result.shader := gLitShader;
   SetMaterialTexture(@Result, MATERIAL_MAP_ALBEDO, tex);
   Result.maps[0].color := tint;
 end;
 
 procedure InitWorldAssets;
 begin
+  rlDisableBackfaceCulling; // hand-built meshes: don't rely on winding
+  InitShaders;
   BuildCubeMesh;
+  BuildSphereMesh(0.5, 5, 7);
+  BuildCylMesh(0.5, 1.0, 7);
+  BuildQuadMesh;
   gMatRock := NewMat(GenTexRock(MkCol(128, 118, 106)), WHITE);
   gMatTrunk := NewMat(GenTexWood(MkCol(96, 72, 48)), WHITE);
-  gMatCanopy := NewMat(GenTexGround(MkCol(30, 80, 36), MkCol(18, 56, 24)), WHITE);
-  gMatWater := NewMat(GenTexWater, Fade(WHITE, 0.85));
-  gMatPortal := NewMat(GenTexGround(MkCol(255, 203, 0), MkCol(255, 240, 150)), Fade(WHITE, 0.45));
+  gMatCanopy := NewMat(GenTexGround(MkCol(34, 92, 42), MkCol(22, 62, 28)), WHITE);
+  gMatWater := NewMat(GenTexWater, Fade(WHITE, 0.8));
+  gMatPortal := NewMat(GenTexGround(MkCol(255, 203, 0), MkCol(255, 240, 150)), WHITE);
   gMatUnder := NewMat(GenTexGround(MkCol(14, 12, 18), MkCol(30, 26, 36)), WHITE);
-  // per-tileset floor (flat slab) + wall (extruded box) materials
-  gFloorMat[0] := NewMat(GenTexGround(MkCol(108, 94, 82), MkCol(62, 52, 46)), WHITE);
+  gMatBody := NewMat(GenTexCloth(MkCol(150, 150, 160)), WHITE);
+  gMatSkin := NewMat(GenTexGround(MkCol(235, 205, 170), MkCol(210, 180, 145)), WHITE);
+  gMatWeapon := NewMat(GenTexGround(MkCol(120, 125, 135), MkCol(80, 84, 92)), WHITE);
+  gMatTrim := NewMat(GenTexGround(MkCol(90, 70, 40), MkCol(60, 46, 28)), WHITE);
+  gMatGlow := NewMat(GenTexGlow, WHITE);
+  gFloorMat[0] := NewMat(GenTexGround(MkCol(126, 110, 96), MkCol(74, 62, 54)), WHITE);
   gWallMat[0] := NewMat(GenTexBrick(MkCol(78, 66, 60), MkCol(36, 30, 27)), MkCol(255, 230, 214));
   gFloorMat[1] := NewMat(GenTexGround(MkCol(58, 98, 62), MkCol(36, 68, 42)), WHITE);
   gWallMat[1] := NewMat(GenTexBrick(MkCol(64, 72, 52), MkCol(30, 36, 24)), WHITE);
@@ -532,44 +779,110 @@ begin
   gWallMat[4] := NewMat(GenTexRock(MkCol(168, 182, 202)), MkCol(235, 242, 255));
   gFloorMat[5] := NewMat(GenTexGround(MkCol(100, 132, 68), MkCol(66, 98, 46)), WHITE);
   gWallMat[5] := NewMat(GenTexRock(MkCol(112, 102, 86)), WHITE);
-  Log('world assets ready: cube mesh + 6 tilesets x (floor+wall materials), props, billboards');
+  Log('world assets v3 ready: meshes (cube/sphere/cyl/quad), 6 tilesets, lit materials');
 end;
 
-{ ----- draw helper: textured unit cube at pos/scale/rotZ ----- }
+{ ================= draw helper (shader swap into material) ================= }
 
-procedure DrawBox(var mesh: TMesh; var mat: TMaterial; x, y, z, sx, sy, sz, rz: Single);
+procedure DrawMeshS(var mesh: TMesh; var mat: TMaterial; const model: TMatrix);
+var
+  saved: TShader;
+begin
+  saved := mat.shader;
+  mat.shader := gActiveShader;
+  DrawMesh(mesh, mat, model);
+  mat.shader := saved;
+end;
+
+procedure DrawBox(var mat: TMaterial; x, y, z, sx, sy, sz, rz: Single);
 var
   tm, ts, tr: TMatrix;
 begin
+  // raylib matrices are row-major (v*M, LEFT operand applied first):
+  // model = Scale * Rotate * Translate
   ts := MatrixScale(sx, sy, sz);
   if rz <> 0 then
   begin
     tr := MatrixRotateZ(rz);
-    ts := MatrixMultiply(tr, ts);
+    ts := MatrixMultiply(ts, tr);
   end;
-  tm := MatrixMultiply(MatrixTranslate(x, y, z), ts);
-  DrawMesh(mesh, mat, tm);
+  tm := MatrixMultiply(ts, MatrixTranslate(x, y, z));
+  DrawMeshS(gCube, mat, tm);
 end;
 
-{ ----- camera + picking ----- }
+{ ================= terrain height field ================= }
+
+function TileH(x, y: Integer): Single;
+var
+  ch: Char;
+  d, lvl: Integer;
+begin
+  if (x < 0) or (y < 0) or (x >= GMap.w) or (y >= GMap.h) then Exit(1.3);
+  ch := GMap.rows[y][x + 1];
+  if ch = '#' then Exit(1.3);
+  if ch = '~' then Exit(0.0);
+  // Coherent height field (per-tile noise reads as rubble at iso zoom):
+  //  - hubs: raised rim around a flat bowl -> town plateau, cliff + ramp at the drop
+  //  - areas/dungeons: broad terraced bands (sin fields) -> cliffs at steps, ramps at edges
+  if GMap.kind = 'hub' then
+  begin
+    d := x; if y < d then d := y;
+    if (GMap.w - 1 - x) < d then d := GMap.w - 1 - x;
+    if (GMap.h - 1 - y) < d then d := GMap.h - 1 - y;
+    if d <= 2 then Exit(0.42) else Exit(0.0);
+  end;
+  lvl := Round(1.1 + 1.15 * Sin(x * 0.19 + y * 0.13) + 0.85 * Sin(x * 0.061 - y * 0.083 + 1.7));
+  lvl := ClampI(lvl, 0, 2);
+  Result := lvl * 0.42;
+end;
+
+function WalkableTile(x, y: Integer): Boolean;
+var
+  ch: Char;
+begin
+  if (x < 0) or (y < 0) or (x >= GMap.w) or (y >= GMap.h) then Exit(False);
+  ch := GMap.rows[y][x + 1];
+  Result := not (ch in ['#', 'T', '^']);
+end;
+
+{ ================= camera ================= }
 
 procedure UpdateCamera;
 var
-  d, sx, sy: Single;
+  d, phi, ch, sh, sx, sy: Single;
 begin
   d := CAM_DIST;
+  curFovy := CAM_FOVY / (1 + zoomLevel * 0.45);
+  if tiltOn then phi := 38.0 else phi := 26.565;
+  phi := phi * Pi / 180;
+  ch := Cos(phi) * 0.7071;
+  sh := Sin(phi);
   sx := 0; sy := 0;
   if optShake and (shake > 0) then
   begin
-    sx := (NextRnd mod 100 - 50) / 100 * shake * 0.35;
-    sy := (NextRnd mod 100 - 50) / 100 * shake * 0.35;
+    // NB: NextRnd is UInt64 — cast BEFORE subtracting or the underflow flies the camera to 1e17
+    sx := (Integer(NextRnd mod 100) - 50) / 100 * shake * 0.35;
+    sy := (Integer(NextRnd mod 100) - 50) / 100 * shake * 0.35;
   end;
-  // 2:1 dimetric: elevation atan(1/2) = 26.565 deg, azimuth 45 deg; z is up
-  cam3.position := V3(GPlayer.x + 0.6325 * d + sx, GPlayer.y + 0.6325 * d + sy, 0.4472 * d);
-  cam3.target := V3(GPlayer.x, GPlayer.y, 0.2);
+  cam3.position := V3(GPlayer.x + ch * d + sx, GPlayer.y + ch * d + sy, sh * d);
+  cam3.target := V3(GPlayer.x, GPlayer.y, 0.3);
   cam3.up := V3(0, 0, 1);
-  cam3.fovy := CAM_FOVY;
+  cam3.fovy := curFovy;
   cam3.projection := CAMERA_ORTHOGRAPHIC;
+end;
+
+procedure UpdateLightCam;
+var
+  cx, cy, s: Single;
+begin
+  cx := GMap.w / 2; cy := GMap.h / 2;
+  s := Max(GMap.w, GMap.h) * 0.75 + 6;
+  lightCam3.position := V3(cx + sunDir.x * 60, cy + sunDir.y * 60, sunDir.z * 60);
+  lightCam3.target := V3(cx, cy, 0);
+  lightCam3.up := V3(0, 0, 1);
+  lightCam3.fovy := 2 * s;
+  lightCam3.projection := CAMERA_ORTHOGRAPHIC;
+  shadowVP := MatrixMultiply(MatrixLookAt(lightCam3.position, lightCam3.target, lightCam3.up), MatrixOrtho(-s, s, -s, s, 0.01, 200));
 end;
 
 procedure MouseToWorld(mx, my: Single; out wx, wy: Single);
@@ -583,7 +896,7 @@ begin
     wx := GPlayer.x; wy := GPlayer.y;
     Exit;
   end;
-  t := (0.02 - ray.position.z) / ray.direction.z; // intersect ground plane z=0.02
+  t := (0.02 - ray.position.z) / ray.direction.z;
   wx := ray.position.x + ray.direction.x * t;
   wy := ray.position.y + ray.direction.y * t;
 end;
@@ -601,77 +914,367 @@ begin
   end;
 end;
 
-{ ----- world draw ----- }
-
-procedure DrawWorld;
+// additive soft glow quad on the ground
+procedure DrawGlow(x, y, z, r: Single; col: TColor);
 var
-  x, y, i: Integer;
-  ch: Char;
-  ts, v: Integer;
+  tm: TMatrix;
+begin
+  gMatGlow.maps[0].color := col;
+  tm := MatrixMultiply(MatrixScale(r * 2, r * 2, 1), MatrixTranslate(x, y, z));
+  DrawMeshS(gQuad, gMatGlow, tm);
+end;
+
+{ ================= body plans / character rigs ================= }
+
+function BodyPlan(const classId: string): TBodyPlan;
+begin
+  Result.scale := 1.12; Result.shoulder := 0.24; Result.torsoH := 0.5;
+  Result.weapLen := 0.7; Result.helm := False; Result.robe := False;
+  if classId = 'wardancer' then begin Result.scale := 0.95; Result.shoulder := 0.24; Result.weapLen := 0.72; end
+  else if classId = 'emberweaver' then begin Result.robe := True; Result.weapLen := 0.95; end
+  else if classId = 'runeforger' then begin Result.shoulder := 0.28; Result.robe := True; Result.weapLen := 0.6; end
+  else if classId = 'shadowpact' then begin Result.scale := 0.95; Result.robe := True; Result.weapLen := 0.66; end
+  else if classId = 'wardens_hound' then begin Result.scale := 1.32; Result.shoulder := 0.36; Result.torsoH := 0.62; Result.helm := True; Result.weapLen := 0.85; end
+  else if classId = 'lightbinder' then begin Result.scale := 0.95; Result.robe := True; Result.weapLen := 0.5; end;
+end;
+
+// draw a humanoid rig from primitives; base = world matrix at feet; anim: phase (walk), atk (0..1 swing), dead (0..1 fall)
+procedure DrawRig(const base: TMatrix; plan: TBodyPlan; bodyCol, skinCol: TColor;
+  walkPhase, atk, dead: Single; moving: Boolean; boss: Boolean);
+var
+  m, m2, rot: TMatrix;
+  swing, bob, armSwing, legSwing: Single;
+  s: Single;
+begin
+  s := plan.scale;
+  swing := 0;
+  if moving then swing := Sin(walkPhase) * 0.55;
+  if moving then bob := Abs(Sin(walkPhase)) * 0.05 else bob := Sin(animT * 2 + 1) * 0.02;
+  // attack swing overrides right arm
+  armSwing := -swing * 0.8;
+  if atk > 0 then armSwing := -2.3 + atk * 3.0;
+  legSwing := swing;
+  gMatBody.maps[0].color := bodyCol;
+  gMatSkin.maps[0].color := skinCol;
+  // NOTE: raylib TMatrix is row-major (v*M, LEFT operand applied first), so every
+  // chain below is built as Scale * offset * rotation * base (scale applied first,
+  // world base last). Verified empirically — see AGENTS.md.
+  // legs (pivot at hip z=0.46*s)
+  m := MatrixMultiply(MatrixTranslate(0.11 * s, 0, 0.46 * s), base);
+  m := MatrixMultiply(MatrixRotateX(legSwing), m);
+  m := MatrixMultiply(MatrixTranslate(0, 0, -0.21 * s), m);
+  DrawMeshS(gCube, gMatBody, MatrixMultiply(MatrixScale(0.14 * s, 0.14 * s, 0.44 * s), m));
+  m := MatrixMultiply(MatrixTranslate(-0.11 * s, 0, 0.46 * s), base);
+  m := MatrixMultiply(MatrixRotateX(-legSwing), m);
+  m := MatrixMultiply(MatrixTranslate(0, 0, -0.21 * s), m);
+  DrawMeshS(gCube, gMatBody, MatrixMultiply(MatrixScale(0.14 * s, 0.14 * s, 0.44 * s), m));
+  // torso
+  m := MatrixMultiply(MatrixTranslate(0, 0, (0.46 + plan.torsoH / 2) * s + bob), base);
+  DrawMeshS(gCube, gMatBody, MatrixMultiply(MatrixScale((plan.shoulder * 2 + 0.08) * s, 0.22 * s, plan.torsoH * s), m));
+  // robe (casters/npcs): cone-ish cylinder over torso+legs
+  if plan.robe then
+  begin
+    m := MatrixMultiply(MatrixTranslate(0, 0, 0.5 * s + bob), base);
+    DrawMeshS(gCyl, gMatBody, MatrixMultiply(MatrixScale(0.34 * s, 0.34 * s, 1.0 * s), m));
+  end;
+  // arms (pivot at shoulder z=0.88*s)
+  m := MatrixMultiply(MatrixTranslate(plan.shoulder * s + 0.06 * s, 0, 0.88 * s + bob), base);
+  m := MatrixMultiply(MatrixRotateX(-legSwing * 0.8), m);
+  m := MatrixMultiply(MatrixTranslate(0, 0, -0.2 * s), m);
+  DrawMeshS(gCube, gMatBody, MatrixMultiply(MatrixScale(0.11 * s, 0.11 * s, 0.42 * s), m));
+  // right arm + weapon
+  m := MatrixMultiply(MatrixTranslate(-(plan.shoulder * s + 0.06 * s), 0, 0.88 * s + bob), base);
+  m := MatrixMultiply(MatrixRotateX(armSwing), m);
+  m := MatrixMultiply(MatrixTranslate(0, 0, -0.2 * s), m);
+  DrawMeshS(gCube, gMatBody, MatrixMultiply(MatrixScale(0.11 * s, 0.11 * s, 0.42 * s), m));
+  // weapon in right hand
+  m2 := MatrixMultiply(MatrixTranslate(-(plan.shoulder * s + 0.06 * s), 0, 0.88 * s + bob), base);
+  m2 := MatrixMultiply(MatrixRotateX(armSwing), m2);
+  m2 := MatrixMultiply(MatrixTranslate(0, 0, -0.42 * s), m2);
+  DrawMeshS(gCube, gMatWeapon, MatrixMultiply(MatrixScale(0.05 * s, 0.05 * s, plan.weapLen * s), m2));
+  // head
+  m := MatrixMultiply(MatrixTranslate(0, 0, (0.46 + plan.torsoH + 0.16) * s + bob), base);
+  DrawMeshS(gSphere, gMatSkin, MatrixMultiply(MatrixScale(0.3 * s, 0.3 * s, 0.32 * s), m));
+  // helm
+  if plan.helm then
+  begin
+    m := MatrixMultiply(MatrixTranslate(0, 0, (0.46 + plan.torsoH + 0.3) * s + bob), base);
+    DrawMeshS(gCube, gMatWeapon, MatrixMultiply(MatrixScale(0.34 * s, 0.34 * s, 0.16 * s), m));
+  end;
+  // boss horns
+  if boss then
+  begin
+    m := MatrixMultiply(MatrixTranslate(0.12 * s, 0, (0.46 + plan.torsoH + 0.32) * s + bob), base);
+    rot := MatrixRotate(V3Norm(V3(0.3, 0.8, 1)), 0.5);
+    DrawMeshS(gCube, gMatTrim, MatrixMultiply(MatrixScale(0.07 * s, 0.07 * s, 0.3 * s), MatrixMultiply(rot, m)));
+    m := MatrixMultiply(MatrixTranslate(-0.12 * s, 0, (0.46 + plan.torsoH + 0.32) * s + bob), base);
+    rot := MatrixRotate(V3Norm(V3(-0.3, 0.8, 1)), 0.5);
+    DrawMeshS(gCube, gMatTrim, MatrixMultiply(MatrixScale(0.07 * s, 0.07 * s, 0.3 * s), MatrixMultiply(rot, m)));
+  end;
+end;
+
+{ ================= scene geometry (drawn in shadow pass + main pass) ================= }
+
+procedure DrawTerrainAndProps;
+var
+  x, y, i, v: Integer;
+  ts: Integer;
   rng: Single;
   x0, x1, y0, y1: Integer;
-  e: TEnt;
-  h, r: Single;
-  tint: TColor;
-  sp: TVector2;
-  ppu: Single; // pixels per world unit (vertical)
-  col: TColor;
-  hpw: Single;
+  ch: Char;
+  h, h2: Single;
+  dx, dy: Integer;
+  axis: TVector3;
+  ang: Single;
+  tm: TMatrix;
 begin
   ts := TilesetIdx(GMap.tileset);
-  rng := CAM_FOVY * 0.5 * (1 + SCREEN_W / SCREEN_H) * 0.85 + 3;
+  rng := curFovy * 0.5 * (1 + SCREEN_W / SCREEN_H) * 0.9 + 4;
   x0 := ClampI(Trunc(GPlayer.x - rng), 0, GMap.w - 1);
   x1 := ClampI(Trunc(GPlayer.x + rng), 0, GMap.w - 1);
   y0 := ClampI(Trunc(GPlayer.y - rng), 0, GMap.h - 1);
   y1 := ClampI(Trunc(GPlayer.y + rng), 0, GMap.h - 1);
-  ClearBackground(MkCol(13, 11, 17));
-  BeginMode3D(cam3);
-  // void skirt under the map
-  DrawBox(gCube, gMatUnder, GMap.w / 2, GMap.h / 2, -0.25, GMap.w + 16, GMap.h + 16, 0.4, 0);
-  // passable tiles first
+  // void skirt
+  DrawBox(gMatUnder, GMap.w / 2, GMap.h / 2, -0.35, GMap.w + 16, GMap.h + 16, 0.5, 0);
+  // tiles (boxes from z=0 to h -> cliff faces at transitions)
   for y := y0 to y1 do
     for x := x0 to x1 do
     begin
       ch := TileAt(x, y);
-      v := (x * 73 + y * 151) mod 3;
-      case ch of
-        '.', ',':
-          DrawBox(gCube, gFloorMat[ts], x + 0.5, y + 0.5, 0.06, 1, 1, 0.12, v * 0.19);
-        'o':
-          begin
-            DrawBox(gCube, gFloorMat[ts], x + 0.5, y + 0.5, 0.06, 1, 1, 0.12, 0);
-            DrawBox(gCube, gMatRock, x + 0.42 + v * 0.12, y + 0.45 + v * 0.1, 0.28, 0.5, 0.5, 0.5, v * 0.68);
-          end;
-        '~':
-          DrawBox(gCube, gMatWater, x + 0.5, y + 0.5, 0.05, 1, 1, 0.10, 0);
-        'P':
-          begin
-            DrawBox(gCube, gFloorMat[ts], x + 0.5, y + 0.5, 0.06, 1, 1, 0.12, 0);
-            DrawGroundRing(x + 0.5, y + 0.5, 0.42, 0.15, Fade(GOLD, 0.5 + 0.3 * Sin(animT * 4)));
-            DrawBox(gCube, gMatPortal, x + 0.5, y + 0.5, 0.75, 0.85, 0.85, 1.5, animT * 0.35);
-          end;
+      h := TileH(x, y);
+      if ch = '~' then
+        DrawBox(gMatWater, x + 0.5, y + 0.5, -0.07, 1, 1, 0.14, 0) // sunken channel, flush top
+      else
+      begin
+        v := (x * 73 + y * 151) mod 3;
+        DrawBox(gFloorMat[ts], x + 0.5, y + 0.5, h / 2, 1, 1, h, v * 0.19);
+        if ch = 'o' then
+          DrawBox(gMatRock, x + 0.42 + v * 0.12, y + 0.45 + v * 0.1, h + 0.22, 0.5, 0.5, 0.44, v * 0.68);
       end;
     end;
-  // obstacles (depth buffer sorts occlusion)
+  // ramps at height transitions between walkable tiles
+  for y := y0 to y1 do
+    for x := x0 to x1 do
+    begin
+      if not WalkableTile(x, y) then Continue;
+      h := TileH(x, y);
+      for i := 0 to 1 do
+      begin
+        dx := 0; dy := 0;
+        if i = 0 then dx := 1 else dy := 1;
+        if not WalkableTile(x + dx, y + dy) then Continue;
+        h2 := TileH(x + dx, y + dy);
+        if Abs(h2 - h) > 0.25 then
+        begin
+          axis := V3Norm(V3Cross(V3(0, 0, 1), V3(dx, dy, 0)));
+          // ramp top surface must run from h (own tile) up/down to h2 (neighbor):
+          // with axis = z x d, a NEGATIVE angle raises the +d end when h2 > h
+          ang := -ArcSin(ClampF((h2 - h) / 1.4, -0.95, 0.95));
+          tm := MatrixMultiply(MatrixScale(1.4, 1.15, 0.12),
+                 MatrixMultiply(MatrixRotate(axis, ang), MatrixTranslate(x + 0.5 + dx * 0.5, y + 0.5 + dy * 0.5, (h + h2) / 2)));
+          DrawMeshS(gCube, gFloorMat[ts], tm);
+        end;
+      end;
+    end;
+  // walls + props
   for y := y0 to y1 do
     for x := x0 to x1 do
     begin
       ch := TileAt(x, y);
       v := (x * 73 + y * 151) mod 3;
+      h := TileH(x, y);
       case ch of
         '#':
-          DrawBox(gCube, gWallMat[ts], x + 0.5, y + 0.5, 0.625, 1, 1, 1.25, v * 0.12);
+          DrawBox(gWallMat[ts], x + 0.5, y + 0.5, h / 2, 1, 1, h, v * 0.12);
         'T':
           begin
-            DrawBox(gCube, gFloorMat[ts], x + 0.5, y + 0.5, 0.06, 1, 1, 0.12, 0);
-            DrawBox(gCube, gMatTrunk, x + 0.5, y + 0.5, 0.5, 0.26, 0.26, 1.0, v * 0.23);
-            DrawBox(gCube, gMatCanopy, x + 0.5, y + 0.55, 1.3, 1.25 + v * 0.2, 1.25 + v * 0.2, 0.95 + v * 0.2, v * 0.5);
+            DrawBox(gMatTrunk, x + 0.5, y + 0.5, h + 0.5, 0.3, 0.3, 1.0, v * 0.23);
+            DrawMeshS(gSphere, gMatCanopy, MatrixMultiply(MatrixScale(1.3 + v * 0.2, 1.3 + v * 0.2, 1.0 + v * 0.2), MatrixTranslate(x + 0.5, y + 0.55, h + 1.15)));
+            DrawMeshS(gSphere, gMatCanopy, MatrixMultiply(MatrixScale(0.9, 0.9, 0.8), MatrixTranslate(x + 0.4 + v * 0.1, y + 0.45, h + 1.55)));
           end;
         '^':
-          DrawBox(gCube, gMatRock, x + 0.5, y + 0.5, 0.34, 0.95, 0.95, 0.68, v * 0.75);
+          DrawMeshS(gSphere, gMatRock, MatrixMultiply(MatrixScale(0.95, 0.95, 0.6), MatrixTranslate(x + 0.5, y + 0.5, h + 0.25)));
+        'P':
+          begin
+            DrawBox(gMatPortal, x + 0.5, y + 0.5, h + 0.08, 0.95, 0.95, 0.16, 0);
+            DrawMeshS(gCyl, gMatPortal, MatrixMultiply(MatrixScale(0.62, 0.62, 1.7), MatrixTranslate(x + 0.5, y + 0.5, h + 0.85)));
+            DrawBox(gMatPortal, x + 0.5, y + 0.5, h + 1.75, 0.8, 0.8, 0.18, animT * 0.35);
+          end;
       end;
     end;
-  // telegraphs (ground decals above floor top z=0.12)
+end;
+
+procedure SyncFx;
+var
+  i: Integer;
+begin
+  if Length(entFx) <> Length(GEnts) then
+  begin
+    SetLength(entFx, Length(GEnts));
+    for i := 0 to High(entFx) do
+    begin
+      entFx[i].phase := 0; entFx[i].atk := 0; entFx[i].dead := 0;
+      entFx[i].seed := i * 1.37; entFx[i].lastState := -1;
+    end;
+  end;
+end;
+
+procedure DrawEntities;
+var
+  i: Integer;
+  e: TEnt;
+  efx: PFx;
+  dt, gh: Single;
+  base, fallRot: TMatrix;
+  plan: TBodyPlan;
+  bodyCol: TColor;
+  moving: Boolean;
+  wx, wy: Single;
+begin
+  SyncFx;
+  dt := animT - lastAnimT;
+  if dt < 0 then dt := 0;
+  if dt > 0.1 then dt := 0.1;
+  for i := 0 to High(GEnts) do
+  begin
+    e := GEnts[i];
+    efx := PFx(@entFx[i]);
+    if (e.kind = ekMonster) and (not e.alive) then
+    begin
+      // fallen corpse: draw rig lying down, grayed
+      if efx^.dead < 1 then efx^.dead := Min(1, efx^.dead + dt * 2.5);
+      gh := TileH(Trunc(e.x), Trunc(e.y));
+      base := MatrixMultiply(MatrixRotateX(-efx^.dead * 1.5), MatrixTranslate(e.x, e.y, gh + 0.05));
+      gMatBody.maps[0].color := Fade(DARKGRAY, 0.9);
+      plan.scale := 0.9 + e.size * 0.4; plan.shoulder := 0.24; plan.torsoH := 0.5;
+      plan.weapLen := 0.6; plan.helm := False; plan.robe := False;
+      DrawRig(base, plan, Fade(DARKGRAY, 0.9), DARKGRAY, 0, 0, efx^.dead, False, e.boss);
+      Continue;
+    end;
+    if not e.alive then Continue;
+    if e.kind = ekProjectile then
+    begin
+      gMatGlow.maps[0].color := ElemCol(e.pelement);
+      DrawMeshS(gSphere, gMatGlow, MatrixMultiply(MatrixScale(0.3, 0.3, 0.3), MatrixTranslate(e.x, e.y, 0.32)));
+      Continue;
+    end;
+    if (e.kind in [ekChest, ekLore, ekMarker]) and e.used then Continue;
+    gh := TileH(Trunc(e.x), Trunc(e.y));
+    // anim state
+    moving := (e.kind = ekMonster) and (e.state in [1, 3]);
+    if moving then efx^.phase := efx^.phase + dt * 7;
+    if (e.kind = ekMonster) and (e.state = 3) and (efx^.lastState <> 3) then efx^.atk := 1;
+    efx^.lastState := e.state;
+    if efx^.atk > 0 then efx^.atk := Max(0, efx^.atk - dt * 3.2);
+    // npc ambient wander (visual only)
+    wx := e.x; wy := e.y;
+    if e.kind = ekNpc then
+    begin
+      efx^.phase := efx^.phase + dt * 5;
+      wx := e.x + Cos(animT * 0.35 + efx^.seed) * 0.35;
+      wy := e.y + Sin(animT * 0.35 + efx^.seed) * 0.35;
+      moving := True;
+    end;
+    base := MatrixMultiply(MatrixRotateZ(e.facing), MatrixTranslate(wx, wy, gh));
+    case e.kind of
+      ekMonster:
+        begin
+          plan.scale := 1.02 + e.size * 0.55; plan.shoulder := 0.24 + e.size * 0.15;
+          plan.torsoH := 0.5 + e.size * 0.2; plan.weapLen := 0.6 + e.size * 0.3;
+          plan.helm := e.boss; plan.robe := False;
+          if e.element <> '' then bodyCol := ElemCol(e.element) else bodyCol := RED;
+          if e.boss then bodyCol := MAROON;
+          if e.enraged then bodyCol := ORANGE;
+          DrawRig(base, plan, bodyCol, MkCol(220, 190, 160), efx^.phase, efx^.atk, 0, moving, e.boss);
+        end;
+      ekNpc:
+        begin
+          plan.scale := 1.12; plan.shoulder := 0.22; plan.torsoH := 0.5; plan.weapLen := 0; plan.helm := False; plan.robe := True;
+          DrawRig(base, plan, MkCol(30, 110, 50), MkCol(240, 210, 170), efx^.phase, 0, 0, moving, False);
+        end;
+      ekChest:
+        DrawBox(gMatTrunk, wx, wy, gh + 0.25, 0.6, 0.6, 0.5, 0);
+      ekLore:
+        DrawBox(gMatBody, wx, wy, gh + 0.3, 0.4, 0.06, 0.55, animT);
+      ekMarker:
+        begin
+          DrawMeshS(gCyl, gMatPortal, MatrixMultiply(MatrixScale(0.3, 0.3, 0.8), MatrixTranslate(wx, wy, gh + 0.4)));
+        end;
+      ekStore:
+        begin
+          DrawBox(gMatTrunk, wx, wy, gh + 0.4, 1.1, 0.9, 0.8, 0);
+          DrawBox(gMatPortal, wx, wy, gh + 0.9, 1.2, 1.0, 0.14, 0);
+        end;
+      ekCorpse:
+        DrawRig(MatrixMultiply(MatrixRotateX(-1.5), MatrixTranslate(wx, wy, gh + 0.05)), plan, DARKGRAY, DARKGRAY, 0, 0, 1, False, False);
+    end;
+  end;
+  // player
+  if not GPlayer.dead then
+  begin
+    if PointDist(GPlayer.x, GPlayer.y, lastPX, lastPY) > 0.002 then
+    begin
+      pFxPhase := pFxPhase + dt * 8;
+      lastPX := GPlayer.x; lastPY := GPlayer.y;
+    end;
+    if GPlayer.atkCd > 0.1 then pFxAtk := 1 - GPlayer.atkCd / 0.45 else pFxAtk := Max(0, pFxAtk - dt * 3.2);
+    plan := BodyPlan(GPlayer.classId);
+    base := MatrixMultiply(MatrixRotateZ(GPlayer.facing), MatrixTranslate(GPlayer.x, GPlayer.y, TileH(Trunc(GPlayer.x), Trunc(GPlayer.y))));
+    DrawRig(base, plan, MkCol(70, 130, 220), MkCol(240, 210, 170), pFxPhase, pFxAtk, 0,
+      (hasMove or (attackTgt >= 0) or (interactTgt >= 0)) and (PointDist(GPlayer.x, GPlayer.y, lastPX, lastPY) > 0.001), False);
+  end
+  else
+  begin
+    if pFxDead < 1 then pFxDead := Min(1, pFxDead + dt * 2.5);
+    plan := BodyPlan(GPlayer.classId);
+    base := MatrixMultiply(MatrixRotateX(-pFxDead * 1.5), MatrixTranslate(GPlayer.x, GPlayer.y, TileH(Trunc(GPlayer.x), Trunc(GPlayer.y)) + 0.05));
+    DrawRig(base, plan, Fade(SKYBLUE, 0.7), DARKGRAY, 0, 0, pFxDead, False, False);
+  end;
+end;
+
+{ ================= world draw ================= }
+
+procedure DrawWorld;
+var
+  i: Integer;
+  e: TEnt;
+  sp: TVector2;
+  ppu, r, hpw: Single;
+  col: TColor;
+  lightDir, lightColor, ambient, viewPos: TVector3;
+begin
+  UpdateLightCam;
+  // ---- shadow pass ----
+  BeginTextureMode(shadowRT);
+  ClearBackground(WHITE);
+  BeginMode3D(lightCam3);
+  gActiveShader := gDepthShader;
+  DrawTerrainAndProps;
+  DrawEntities;
+  EndMode3D;
+  EndTextureMode;
+  // ---- main pass ----
+  ClearBackground(MkCol(24, 22, 34));
+  BeginMode3D(cam3);
+  gActiveShader := gLitShader;
+  BeginShaderMode(gLitShader);
+  lightDir := sunDir;
+  lightColor := V3(1.05, 0.98, 0.86);
+  ambient := V3(0.48, 0.48, 0.56);
+  viewPos := cam3.position;
+  SetShaderValue(gLitShader, locLightDir, @lightDir, SHADER_UNIFORM_VEC3);
+  SetShaderValue(gLitShader, locLightColor, @lightColor, SHADER_UNIFORM_VEC3);
+  SetShaderValue(gLitShader, locAmbient, @ambient, SHADER_UNIFORM_VEC3);
+  SetShaderValue(gLitShader, locViewPos, @viewPos, SHADER_UNIFORM_VEC3);
+  SetShaderValueMatrix(gLitShader, locShadowVP, shadowVP);
+  rlActiveTextureSlot(1);
+  rlEnableTexture(shadowRT.texture.id);
+  rlSetUniformSampler(locShadowMap, 1);
+  DrawTerrainAndProps;
+  DrawEntities;
+  EndShaderMode;
+  // ---- glow decals (additive, unlit) ----
+  BeginBlendMode(BLEND_ADDITIVE);
   if optTelegraph then
     for i := 0 to High(GEnts) do
     begin
@@ -679,64 +1282,39 @@ begin
       if (e.kind = ekMonster) and e.alive and (e.state = 2) then
       begin
         r := e.attackRange;
-        DrawCircle3D(V3(e.x, e.y, 0.16), r, V3(1, 0, 0), -90, Fade(ORANGE, 0.20 + 0.12 * Sin(animT * 18)));
-        DrawGroundRing(e.x, e.y, r, 0.16, Fade(ORANGE, 0.9));
-        DrawGroundRing(e.x, e.y, Max(0.05, r * e.stateT / Max(0.001, e.windup)), 0.17, Fade(RED, 0.9));
+        DrawGlow(e.x, e.y, TileH(Trunc(e.x), Trunc(e.y)) + 0.06, r, Fade(ORANGE, 0.55 + 0.25 * Sin(animT * 18)));
+        DrawGlow(e.x, e.y, TileH(Trunc(e.x), Trunc(e.y)) + 0.07, Max(0.08, r * e.stateT / Max(0.001, e.windup)), Fade(RED, 0.9));
       end;
     end;
-  // click-to-move markers
   for i := 0 to High(moveMarks) do
     with moveMarks[i] do
-      DrawGroundRing(x, y, 0.28 + 0.08 * Sin(animT * 10), 0.15, Fade(GOLD, ClampF(t / 0.6, 0, 1)));
-  // entities: shadow + billboard (monsters/npcs/etc), sphere for projectiles
-  for i := 0 to High(GEnts) do
-  begin
-    e := GEnts[i];
-    if not e.alive then Continue;
-    if e.kind = ekProjectile then
+      DrawGlow(x, y, TileH(Trunc(x), Trunc(y)) + 0.06, 0.3 + 0.08 * Sin(animT * 10), Fade(GOLD, ClampF(t / 0.6, 0, 1) * 0.9));
+  // portal glow rings
+  for i := 0 to High(GMap.portals) do
+    with GMap.portals[i] do
+      DrawGlow(x + 0.5, y + 0.5, TileH(x, y) + 0.1, 0.55, Fade(GOLD, 0.4 + 0.2 * Sin(animT * 4)));
+  EndBlendMode;
+  // telegraph outlines
+  if optTelegraph then
+    for i := 0 to High(GEnts) do
     begin
-      col := ElemCol(e.pelement);
-      DrawSphere(V3(e.x, e.y, 0.32), 0.14, col);
-      DrawSphere(V3(e.x, e.y, 0.32), 0.30, Fade(col, 0.25));
-      Continue;
+      e := GEnts[i];
+      if (e.kind = ekMonster) and e.alive and (e.state = 2) then
+      begin
+        DrawGroundRing(e.x, e.y, e.attackRange, TileH(Trunc(e.x), Trunc(e.y)) + 0.06, Fade(ORANGE, 0.9));
+      end;
     end;
-    case e.kind of
-      ekMonster: begin r := 0.35 + e.size * 0.3; h := (0.9 + e.size * 0.5) * (1 + e.scale * 0.4); if e.boss then h := h * 1.7; end;
-    else begin r := 0.32; h := 0.95; end;
-    end;
-    if e.boss then r := r * 1.5;
-    if (e.kind = ekChest) or (e.kind = ekLore) or (e.kind = ekMarker) then
-    begin
-      if e.used then Continue;
-      h := 0.55; r := 0.3;
-    end;
-    if e.kind = ekStore then begin h := 1.1; r := 0.4; end;
-    DrawCircle3D(V3(e.x, e.y, 0.13), r, V3(1, 0, 0), -90, Fade(BLACK, 0.4));
-    if e.kind = ekMonster then
-      tint := IIfC(e.enraged, ORANGE, IIfC(e.boss, MAROON, WHITE))
-    else
-      tint := WHITE;
-    DrawBillboard(cam3, EntTexFor(e), V3(e.x, e.y, 0.12 + h / 2), h, tint);
-  end;
-  // player
-  if not GPlayer.dead then
-  begin
-    if GPlayer.dodgeT > 0 then col := Fade(SKYBLUE, 0.6) else col := WHITE;
-    DrawCircle3D(V3(GPlayer.x, GPlayer.y, 0.13), 0.36, V3(1, 0, 0), -90, Fade(BLACK, 0.45));
-    DrawBillboard(cam3, BillTex('player', ekMonster, SKYBLUE, False), V3(GPlayer.x, GPlayer.y, 0.12 + 0.5), 1.0, col);
-    // facing tick in 3D
-    DrawLine3D(V3(GPlayer.x, GPlayer.y, 0.75), V3(GPlayer.x + Cos(GPlayer.facing) * 0.55, GPlayer.y + Sin(GPlayer.facing) * 0.55, 0.75), WHITE);
-  end;
   EndMode3D;
-  // ---- 2D label pass (names, hp bars, markers, damage numbers, hover ring) ----
-  ppu := SCREEN_H / CAM_FOVY;
+  // ---- 2D label pass ----
+  lastAnimT := animT;
+  ppu := SCREEN_H / curFovy;
   for i := 0 to High(GEnts) do
   begin
     e := GEnts[i];
-    if not e.alive then Continue;
+    if not e.alive and (e.kind <> ekMonster) then Continue;
     if e.kind = ekProjectile then Continue;
     if (e.kind in [ekChest, ekLore, ekMarker]) and e.used then Continue;
-    sp := GetWorldToScreen(V3(e.x, e.y, 0.12), cam3);
+    sp := GetWorldToScreen(V3(e.x, e.y, TileH(Trunc(e.x), Trunc(e.y)) + 0.1), cam3);
     if e.kind = ekMonster then
     begin
       r := (0.35 + e.size * 0.3) * ppu;
@@ -748,14 +1326,14 @@ begin
     end;
     if e.kind = ekNpc then
     begin
-      Text(Round(sp.x - TextW(e.name, 13) / 2), Round(sp.y - 34), 13, e.name, RAYWHITE);
+      Text(Round(sp.x - TextW(e.name, 13) / 2), Round(sp.y - 40), 13, e.name, RAYWHITE);
       if HasQuestFor(e.id) then
-        Text(Round(sp.x + 8), Round(sp.y - 40), 20, '!', GOLD);
+        Text(Round(sp.x + 8), Round(sp.y - 46), 20, '!', GOLD);
     end;
     if e.kind = ekMarker then
       Text(Round(sp.x - TextW(e.caption, 12) / 2), Round(sp.y + 6), 12, e.caption, RAYWHITE);
     if e.kind = ekStore then
-      Text(Round(sp.x - 20), Round(sp.y - 30), 16, 'STORE', GOLD);
+      Text(Round(sp.x - 20), Round(sp.y - 34), 16, 'STORE', GOLD);
     if e.kind = ekCorpse then
       Text(Round(sp.x - TextW('corpse', 12) / 2), Round(sp.y + 4), 12, 'corpse (' + I2S(GPlayer.lostXP) + ' xp)', GRAY);
     if i = hoverEnt then
@@ -771,14 +1349,14 @@ begin
   end;
   if not GPlayer.dead then
   begin
-    sp := GetWorldToScreen(V3(GPlayer.x, GPlayer.y, 0.12), cam3);
-    Text(Round(sp.x - TextW(GPlayer.name, 13) / 2), Round(sp.y - 40), 13, GPlayer.name, RAYWHITE);
+    sp := GetWorldToScreen(V3(GPlayer.x, GPlayer.y, TileH(Trunc(GPlayer.x), Trunc(GPlayer.y)) + 0.1), cam3);
+    Text(Round(sp.x - TextW(GPlayer.name, 13) / 2), Round(sp.y - 46), 13, GPlayer.name, RAYWHITE);
   end;
   if optDmgNum then
     for i := 0 to High(GDmgNums) do
       with GDmgNums[i] do
       begin
-        sp := GetWorldToScreen(V3(x, y, 0.5 + t * 0.8), cam3);
+        sp := GetWorldToScreen(V3(x, y, TileH(Trunc(x), Trunc(y)) + 0.9 + t * 0.8), cam3);
         if crit then col := GOLD else col := RAYWHITE;
         Text(Round(sp.x - TextW(txt, 16) / 2), Round(sp.y - t * 30), 16, txt, Fade(col, 1 - t / 1.2));
       end;
@@ -805,6 +1383,7 @@ begin
   Result := False;
 end;
 
+{ ---------------- HUD ---------------- }
 { ---------------- HUD ---------------- }
 { ---------------- HUD ---------------- }
 
@@ -1737,7 +2316,7 @@ begin
     cursorState := 4
   else
   begin
-    ppu := SCREEN_H / CAM_FOVY;
+    ppu := SCREEN_H / curFovy;
     best := 1e9;
     for i := 0 to High(GEnts) do
     begin
@@ -2005,6 +2584,12 @@ begin
   if IsKeyPressed(KEY_F4) then optTelegraph := not optTelegraph;
   if IsKeyPressed(KEY_F5) then optDmgNum := not optDmgNum;
   if IsKeyPressed(KEY_F10) then TakeScreenshot('shot.png');
+  // camera zoom (wheel / PgUp PgDn / + -) and tilt toggle (T)
+  if GetMouseWheelMove > 0 then zoomLevel := Max(0, zoomLevel - 1)
+  else if GetMouseWheelMove < 0 then zoomLevel := Min(2, zoomLevel + 1);
+  if IsKeyPressed(KEY_PAGE_UP) or IsKeyPressed(KEY_EQUAL) then zoomLevel := Max(0, zoomLevel - 1);
+  if IsKeyPressed(KEY_PAGE_DOWN) or IsKeyPressed(KEY_MINUS) then zoomLevel := Min(2, zoomLevel + 1);
+  if IsKeyPressed(KEY_T) then tiltOn := not tiltOn;
   // portals
   for i := 0 to High(GMap.portals) do
   begin
@@ -2029,8 +2614,11 @@ var
   frame: Integer;
   bi, i: Integer;
   bd: Single;
+  shot2done: Boolean;
+  shot2frame, teleOK: Integer;
 begin
   shotMode := shot;
+  shot2done := False; shot2frame := 0; teleOK := 0; zoomLevel := 0; tiltOn := False;
   optShake := True; optTelegraph := True; optDmgNum := True;
   LoadAllData;
   SetTraceLogLevel(LOG_WARNING);
@@ -2051,6 +2639,17 @@ begin
   begin
     dt := GetFrameTime;
     animT := animT + dt;
+    if shotMode and (frame > 61) then
+    begin
+      // screenshot harness god-mode: acceptance shots must show combat, not the death screen
+      GPlayer.hp := GetStat(GPlayer, 'max_hp');
+      GPlayer.mana := GetStat(GPlayer, 'max_mana');
+      if GPlayer.dead then
+      begin
+        GPlayer.dead := False;
+        state := gsGame;
+      end;
+    end;
     BeginDrawing;
     case state of
       gsTitle: DrawTitle;
@@ -2095,9 +2694,9 @@ begin
       if (frame = 148) then CmdMoveTo(GPlayer.x + 2.5, GPlayer.y + 1.5); // click-move indicator demo
       if (frame = 150) then TakeScreenshot('shot_hub.png');
       if (frame = 151) then EnterMap('emberfall_area1', -1, -1);
-      if frame > 91 then
+      if frame > 151 then
       begin
-        // drive the real point-and-click path: click the nearest monster once
+        // drive the real point-and-click path: click the nearest monster, keep swinging
         bi := -1; bd := 1e9;
         for i := 0 to High(GEnts) do
           if (GEnts[i].kind = ekMonster) and GEnts[i].alive then
@@ -2106,12 +2705,44 @@ begin
               bd := PointDist(GPlayer.x, GPlayer.y, GEnts[i].x, GEnts[i].y);
               bi := i;
             end;
-        if (bi >= 0) and (frame = 152) then CmdAttackEnt(bi);
-        if frame = 400 then TakeScreenshot('shot_combat.png');
-        if frame >= 430 then
+        if bi >= 0 then
         begin
-          Log('shot mode done');
-          Break;
+          // harness: keep the player in the fray next to the target so the swing
+          // anim + telegraph are captured in-frame (screenshot driver only)
+          GPlayer.x := GEnts[bi].x + 1.3;
+          GPlayer.y := GEnts[bi].y + 0.4;
+          if GPlayer.atkCd <= 0 then CmdAttackEnt(bi);
+          // pin the nearest monster in windup so the telegraph decal is visible in shot 2
+          GEnts[bi].state := 2;
+          GEnts[bi].stateT := 0.55;
+          GEnts[bi].windup := 1.1;
+        end;
+        // acceptance shot 2: player mid-attack-swing while a monster telegraphs (default zoom).
+        // TakeScreenshot captures the last PRESENTED frame, so require the swing+telegraph
+        // condition to hold for several consecutive frames before shooting.
+        if (not shot2done) and (GPlayer.atkCd > 0.18) and (bi >= 0) then Inc(teleOK) else teleOK := 0;
+        if (not shot2done) and (teleOK >= 3) then
+        begin
+          TakeScreenshot('shot_combat.png');
+          shot2done := True;
+          shot2frame := frame;
+        end;
+        if (not shot2done) and (frame >= 260) then
+        begin
+          TakeScreenshot('shot_combat.png'); // fallback
+          shot2done := True;
+          shot2frame := frame;
+        end;
+        // acceptance shot 3: SAME scene a few frames later at max zoom
+        if shot2done then
+        begin
+          if frame = shot2frame + 14 then zoomLevel := 2;
+          if frame = shot2frame + 24 then TakeScreenshot('shot_zoom.png');
+          if frame >= shot2frame + 40 then
+          begin
+            Log('shot mode done');
+            Break;
+          end;
         end;
       end;
     end;

@@ -91,6 +91,15 @@ const
   CAMERA_ORTHOGRAPHIC = 1;
   // MaterialMapIndex
   MATERIAL_MAP_ALBEDO = 0;
+  // ShaderUniformDataType
+  SHADER_UNIFORM_FLOAT = 0;
+  SHADER_UNIFORM_VEC2 = 1;
+  SHADER_UNIFORM_VEC3 = 2;
+  SHADER_UNIFORM_VEC4 = 3;
+  SHADER_UNIFORM_INT = 4;
+  // BlendMode
+  BLEND_ALPHA = 0;
+  BLEND_ADDITIVE = 1;
   // MouseButton
   MOUSE_BUTTON_LEFT = 0; MOUSE_BUTTON_RIGHT = 1; MOUSE_BUTTON_MIDDLE = 2;
   // KeyboardKey (subset)
@@ -265,6 +274,25 @@ function MatrixScale(x, y, z: Single): TMatrix; cdecl; external 'raylib' name 'M
 function MatrixRotateX(angle: Single): TMatrix; cdecl; external 'raylib' name 'MatrixRotateX';
 function MatrixRotateZ(angle: Single): TMatrix; cdecl; external 'raylib' name 'MatrixRotateZ';
 function MatrixMultiply(left, right: TMatrix): TMatrix; cdecl; external 'raylib' name 'MatrixMultiply';
+function MatrixRotate(axis: TVector3; angle: Single): TMatrix; cdecl; external 'raylib' name 'MatrixRotate';
+function MatrixLookAt(eye, target, up: TVector3): TMatrix; cdecl; external 'raylib' name 'MatrixLookAt';
+function MatrixOrtho(left, right, bottom, top, nearPlane, farPlane: Double): TMatrix; cdecl; external 'raylib' name 'MatrixOrtho';
+
+// shaders / blending / rlgl bits
+function LoadShaderFromMemory(vsCode, fsCode: PAnsiChar): TShader; cdecl; external 'raylib' name 'LoadShaderFromMemory';
+procedure UnloadShader(shader: TShader); cdecl; external 'raylib' name 'UnloadShader';
+function GetShaderLocation(shader: TShader; const uniformName: PAnsiChar): Integer; cdecl; external 'raylib' name 'GetShaderLocation';
+procedure SetShaderValue(shader: TShader; locIndex: Integer; const value: Pointer; uniformType: Integer); cdecl; external 'raylib' name 'SetShaderValue';
+procedure SetShaderValueMatrix(shader: TShader; locIndex: Integer; mat: TMatrix); cdecl; external 'raylib' name 'SetShaderValueMatrix';
+procedure SetShaderValueTexture(shader: TShader; locIndex: Integer; texture: TTexture2D); cdecl; external 'raylib' name 'SetShaderValueTexture';
+procedure BeginShaderMode(shader: TShader); cdecl; external 'raylib' name 'BeginShaderMode';
+procedure EndShaderMode; cdecl; external 'raylib' name 'EndShaderMode';
+procedure BeginBlendMode(mode: Integer); cdecl; external 'raylib' name 'BeginBlendMode';
+procedure EndBlendMode; cdecl; external 'raylib' name 'EndBlendMode';
+procedure rlDisableBackfaceCulling; cdecl; external 'raylib' name 'rlDisableBackfaceCulling';
+procedure rlActiveTextureSlot(slot: Integer); cdecl; external 'raylib' name 'rlActiveTextureSlot';
+procedure rlEnableTexture(id: LongWord); cdecl; external 'raylib' name 'rlEnableTexture';
+procedure rlSetUniformSampler(locIndex: Integer; texUnit: LongWord); cdecl; external 'raylib' name 'rlSetUniformSampler';
 
 // 3D shapes (immediate mode)
 procedure DrawCube(position: TVector3; width, height, length: Single; color: TColor); cdecl; external 'raylib' name 'DrawCube';
