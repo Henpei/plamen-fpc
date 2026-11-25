@@ -59,6 +59,7 @@ var
   np, ns, nc, nl, nm: Integer;
   gx, gy: Integer;
   ch: Char;
+  line: string;
   sp: TStrArray;
   iv, fv: Integer;
 begin
@@ -76,7 +77,6 @@ begin
   begin
     if not headerDone then
     begin
-      var line: string;
       line := Trim(lines[i]);
       if line = '' then Continue;
       if line[1] <> '#' then
@@ -109,7 +109,8 @@ begin
       end;
       headerDone := True;
     end;
-    // grid row
+    // grid row (skip blank trailing lines)
+    if Trim(lines[i]) = '' then Continue;
     if Length(lines[i]) <> GMap.w then
       FatalF('%s:%d grid row width %d != w=%d', [path, i + 1, Length(lines[i]), GMap.w]);
     SetLength(GMap.rows, Length(GMap.rows) + 1);

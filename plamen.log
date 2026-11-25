@@ -121,3 +121,96 @@
 2026-11-25 02:38:28 LEVEL UP: SaveTest reached level 2
 2026-11-25 02:38:28 LEVEL UP: SaveTest reached level 3
 2026-11-25 02:38:28 QUEST COMPLETE: Ashes of the Purge
+2026-11-25 02:44:38 PLAMEN boot commit=27dc750 built=2026-11-25T01:44:35Z
+2026-11-25 02:44:38 data loaded: 31 stats, 6 elements, 5 races, 6 classes, 199 skills, 36 spells, 21 monsters, 32 affixes, 6 pools, 33 items, 52 uniques, 16 tables, 10 npcs, 47 quests, 13 rules, 26 lore, 5 stores, 5 regions, 12 builds
+2026-11-25 02:44:38 LEVEL UP: XPTest reached level 2
+2026-11-25 02:44:38 LEVEL UP: XPTest reached level 3
+2026-11-25 02:44:38 LEVEL UP: XPTest reached level 4
+2026-11-25 02:44:38 LEVEL UP: XPTest reached level 5
+2026-11-25 02:44:38 QUEST COMPLETE: Ashes of the Purge
+2026-11-25 02:44:38 QUEST COMPLETE: The Looter of Cinderhold
+2026-11-25 02:44:38 LEVEL UP: QuestTest reached level 2
+2026-11-25 02:44:38 QUEST COMPLETE: The Cell in Maren
+2026-11-25 02:44:38 QUEST COMPLETE: Ashes of the Purge
+2026-11-25 02:44:38 QUEST COMPLETE: The Looter of Cinderhold
+2026-11-25 02:44:38 QUEST FAILED: Hold the Walls
+2026-11-25 02:44:38 LEVEL UP: SaveTest reached level 2
+2026-11-25 02:44:38 LEVEL UP: SaveTest reached level 3
+2026-11-25 02:44:38 QUEST COMPLETE: Ashes of the Purge
+2026-11-25 02:44:38 PLAMEN boot commit=27dc750 built=2026-11-25T01:44:35Z
+2026-11-25 02:44:38 data loaded: 31 stats, 6 elements, 5 races, 6 classes, 199 skills, 36 spells, 21 monsters, 32 affixes, 6 pools, 33 items, 52 uniques, 16 tables, 10 npcs, 47 quests, 13 rules, 26 lore, 5 stores, 5 regions, 12 builds
+2026-11-25 02:44:38 font loaded: /usr/share/fonts/TTF/DejaVuSans.ttf
+2026-11-25 02:44:38 FATAL: data/maps/cinderhold.map:53 grid row width 0 != w=48
+2026-11-25 02:44:44 PLAMEN boot commit=27dc750 built=2026-11-25T01:44:43Z
+2026-11-25 02:44:44 data loaded: 31 stats, 6 elements, 5 races, 6 classes, 199 skills, 36 spells, 21 monsters, 32 affixes, 6 pools, 33 items, 52 uniques, 16 tables, 10 npcs, 47 quests, 13 rules, 26 lore, 5 stores, 5 regions, 12 builds
+2026-11-25 02:44:44 font loaded: /usr/share/fonts/TTF/DejaVuSans.ttf
+2026-11-25 02:44:44 map loaded: Cinderhold (emberfall/hub, 48x36, 3 portals, 1 spawns, boss=)
+2026-11-25 02:44:44 autosave ok
+2026-11-25 02:44:45 map loaded: Ashen Flats (emberfall/area, 48x36, 2 portals, 4 spawns, boss=)
+2026-11-25 02:44:45 autosave ok
+2026-11-25 02:44:46 LOOT: Fine Mana Vial of Grace
+2026-11-25 02:44:46 KILL: Cinder Imp
+2026-11-25 02:44:46 LOOT: Fine Mana Vial of Spirit
+2026-11-25 02:44:46 KILL: War-Banner Cultist
+2026-11-25 02:44:47 KILL: Cinder Imp
+2026-11-25 02:44:48 KILL: Cinder Imp
+2026-11-25 02:44:48 LOOT: Fine Mana Vial of Resolve
+2026-11-25 02:44:48 KILL: War-Banner Cultist
+2026-11-25 02:44:48 PLAYER DIED at emberfall_area1 (21.2,19.0) — lost 25 XP, corpse False
+2026-11-25 02:44:49 shot mode done
+2026-11-25 02:44:49 PLAMEN exit ok
+2026-11-25 02:45:17 PLAMEN boot commit=27dc750 built=2026-11-25T01:45:17Z
+2026-11-25 02:45:17 data loaded: 31 stats, 6 elements, 5 races, 6 classes, 199 skills, 36 spells, 21 monsters, 32 affixes, 6 pools, 33 items, 52 uniques, 16 tables, 10 npcs, 47 quests, 13 rules, 26 lore, 5 stores, 5 regions, 12 builds
+2026-11-25 02:45:17 font loaded: /usr/share/fonts/TTF/DejaVuSans.ttf
+2026-11-25 02:45:17 map loaded: Cinderhold (emberfall/hub, 48x36, 3 portals, 1 spawns, boss=)
+2026-11-25 02:45:17 autosave ok
+2026-11-25 02:45:19 map loaded: Ashen Flats (emberfall/area, 48x36, 2 portals, 4 spawns, boss=)
+2026-11-25 02:45:19 autosave ok
+2026-11-25 02:45:20 LOOT: Fine Mana Vial of Wits
+2026-11-25 02:45:20 KILL: Cinder Imp
+2026-11-25 02:45:20 LOOT: Fine Mana Vial of Spirit
+2026-11-25 02:45:20 KILL: War-Banner Cultist
+2026-11-25 02:45:20 KILL: Cinder Imp
+2026-11-25 02:45:21 LOOT: Enchanted Mana Vial of Blocking of Grace
+2026-11-25 02:45:21 KILL: Cinder Imp
+2026-11-25 02:45:21 KILL: Cinder Imp
+2026-11-25 02:45:21 KILL: Cinder Imp
+2026-11-25 02:45:22 KILL: War-Banner Cultist
+2026-11-25 02:45:22 PLAYER DIED at emberfall_area1 (22.5,17.3) — lost 33 XP, corpse False
+2026-11-25 02:45:23 shot mode done
+2026-11-25 02:45:23 PLAMEN exit ok
+2026-11-25 02:45:55 PLAMEN boot commit=27dc750 built=2026-11-25T01:45:54Z
+2026-11-25 02:45:55 data loaded: 31 stats, 6 elements, 5 races, 6 classes, 199 skills, 36 spells, 21 monsters, 32 affixes, 6 pools, 33 items, 52 uniques, 16 tables, 10 npcs, 47 quests, 13 rules, 26 lore, 5 stores, 5 regions, 12 builds
+2026-11-25 02:45:55 LEVEL UP: XPTest reached level 2
+2026-11-25 02:45:55 LEVEL UP: XPTest reached level 3
+2026-11-25 02:45:55 LEVEL UP: XPTest reached level 4
+2026-11-25 02:45:55 LEVEL UP: XPTest reached level 5
+2026-11-25 02:45:55 QUEST COMPLETE: Ashes of the Purge
+2026-11-25 02:45:55 QUEST COMPLETE: The Looter of Cinderhold
+2026-11-25 02:45:55 LEVEL UP: QuestTest reached level 2
+2026-11-25 02:45:55 QUEST COMPLETE: The Cell in Maren
+2026-11-25 02:45:55 QUEST COMPLETE: Ashes of the Purge
+2026-11-25 02:45:55 QUEST COMPLETE: The Looter of Cinderhold
+2026-11-25 02:45:55 QUEST FAILED: Hold the Walls
+2026-11-25 02:45:55 LEVEL UP: SaveTest reached level 2
+2026-11-25 02:45:55 LEVEL UP: SaveTest reached level 3
+2026-11-25 02:45:55 QUEST COMPLETE: Ashes of the Purge
+2026-11-25 02:46:03 PLAMEN boot commit=27dc750 built=2026-11-25T01:46:03Z
+2026-11-25 02:46:03 data loaded: 31 stats, 6 elements, 5 races, 6 classes, 199 skills, 36 spells, 21 monsters, 32 affixes, 6 pools, 33 items, 52 uniques, 16 tables, 10 npcs, 47 quests, 13 rules, 26 lore, 5 stores, 5 regions, 12 builds
+2026-11-25 02:46:03 font loaded: /usr/share/fonts/TTF/DejaVuSans.ttf
+2026-11-25 02:46:04 map loaded: Cinderhold (emberfall/hub, 48x36, 3 portals, 1 spawns, boss=)
+2026-11-25 02:46:04 autosave ok
+2026-11-25 02:46:06 map loaded: Ashen Flats (emberfall/area, 48x36, 2 portals, 4 spawns, boss=)
+2026-11-25 02:46:06 autosave ok
+2026-11-25 02:46:07 KILL: Cinder Imp
+2026-11-25 02:46:07 LOOT: Fine Mana Vial of Spirit
+2026-11-25 02:46:07 KILL: War-Banner Cultist
+2026-11-25 02:46:07 KILL: Cinder Imp
+2026-11-25 02:46:08 KILL: Cinder Imp
+2026-11-25 02:46:08 LOOT: Order Sigil Badge
+2026-11-25 02:46:08 KILL: War-Banner Cultist
+2026-11-25 02:46:08 KILL: Cinder Imp
+2026-11-25 02:46:08 KILL: Cinder Imp
+2026-11-25 02:46:09 PLAYER DIED at emberfall_area1 (22.7,17.1) — lost 33 XP, corpse True
+2026-11-25 02:46:11 shot mode done
+2026-11-25 02:46:11 PLAMEN exit ok

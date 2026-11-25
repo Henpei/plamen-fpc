@@ -357,6 +357,12 @@ gen_map("crown_dungeon","Heart of the Crown","crown","dungeon",seed=54,
         portals=[("crown_area1",40,30)],
         spawns=[("storm_revenant",4,6)], boss="crown_warden",
         chests=["t_chest_rare"], lores=["lore_crown_3","lore_unlit_codex"], markers={"flameheart":"The Flameheart"})
+# alternate hub after overrun (rule r_cinderhold_fallen)
+gen_map("cinderhold_ruins","Cinderhold Ruins","emberfall","hub",seed=15,
+        portals=[("worldmap",24,18),("emberfall_area1",6,30),("emberfall_area2",40,30)],
+        spawns=[("ember_hound",4,5),("sulfur_spider",3,5)], chests=["t_chest"],
+        lores=["lore_cinder_1"], markers={"gate_wall":"Broken Gate"},
+        store="cinderhold_store", npc_floor=[(14,12),(20,18),(8,20),(26,10),(11,24)])
 # World map
 gen_map("worldmap","The World of Plamen","world","hub",w=40,h=28,seed=99,
         portals=[("cinderhold",24,26),("veil_hub",8,20),("glass_hub",32,20),("maren_hub",10,8),("crown_hub",30,6)],

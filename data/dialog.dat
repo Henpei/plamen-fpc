@@ -52,7 +52,7 @@ line=|||End=>end
 
 [dialog:dagny:start]
 line=||Bone-Carver Dagny looks up from her ledger of the dead. "Resurrection? {DAGNY_PRICE} gold, and the Choir takes its tithe in memories."|Resurrect me (pay).|goto:dagny_pay
-line=||"Corpse-heirlooms, fresh from the grave-robbers' market. If someone you knew died, their things might be here."|Browse heirlooms.|goto:dagny_shop
+line=||"Corpse-heirlooms, fresh from the grave-robbers' market. If someone you knew died, their things might be here."|Browse heirlooms.|store
 line=|||End=>end
 
 [dialog:dagny:pay]
@@ -65,8 +65,8 @@ line=|||End=>end
 line=|||End=>end
 
 [dialog:wrong_magni:start]
-line=||Wrong Magni, caravan master of the Gilded Compact. "Everything's for sale, darling — even the rope. Prices depend on how much the Compact likes you. Currently: tolerable."|Browse wares.|goto:magni_store
-line=compact.trust>=3|"My favorite customer! Trust level {COMPACT_TRUST} — enjoy the discount, darling."|Browse wares.|goto:magni_store
+line=||Wrong Magni, caravan master of the Gilded Compact. "Everything's for sale, darling — even the rope. Prices depend on how much the Compact likes you. Currently: tolerable."|Browse wares.|store
+line=compact.trust>=3|"My favorite customer! Trust level {COMPACT_TRUST} — enjoy the discount, darling."|Browse wares.|store
 line=|||End=>end
 
 [dialog:wrong_magni:store]
@@ -86,7 +86,7 @@ line=||"The Flameheart under the Crown was not an engine. It was alive. The Orde
 line=|||End=>end
 
 [dialog:vessel_quill:start]
-line=npc.vessel_quill==alive|Vessel Quill, Remnant. "Sela will kill me if she finds me — she killed the rest of my cell. Spells for sale, if you've coin. I don't forgive, but I sell."|Browse spells.|goto:quill_shop
+line=npc.vessel_quill==alive|Vessel Quill, Remnant. "Sela will kill me if she finds me — she killed the rest of my cell. Spells for sale, if you've coin. I don't forgive, but I sell."|Browse spells.|store
 line=||Vessel Quill is dead. The Vigil's justice is thorough.|goto:quill_end
 
 [dialog:vessel_quill:shop]

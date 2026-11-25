@@ -872,6 +872,7 @@ end;
 
 procedure CompleteQuest(var p: TPlayer; const qid: string);
 var
+  actBefore: string;
   rid: string;
   rest: string;
   kv2: TStrArray;
@@ -880,6 +881,7 @@ var
 begin
   qi := FindQuest(qid);
   if qi < 0 then Exit;
+  actBefore := FlagGet(p.flags, 'act');
   for j := 0 to High(p.quests) do
     if p.quests[j].id = qid then
     begin
@@ -911,6 +913,8 @@ begin
   end;
   for j := 0 to High(GQuests[qi].unlocks) do
     FlagSet(p.flags, 'quest.' + GQuests[qi].unlocks[j] + '.unlocked', '1');
+  if FlagGet(p.flags, 'act') <> actBefore then
+    FireRules(p, 'act:' + FlagGet(p.flags, 'act'));
   Log('QUEST COMPLETE: ' + GQuests[qi].title);
   FireRules(p, 'quest:' + qid);
   QuestRefresh(p);

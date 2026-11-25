@@ -6,7 +6,7 @@ biome=ash
 act=1
 desc=Ashen plains and dormant volcanoes, hardest hit by the Sundering. Hub: Cinderhold.
 hub_map=cinderhold
-maps=cinderhold|emberfall_area1|emberfall_area2|emberfall_dungeon
+maps=cinderhold|cinderhold_ruins|emberfall_area1|emberfall_area2|emberfall_dungeon
 
 [region:veil]
 name=The Verdant Veil

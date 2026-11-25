@@ -164,7 +164,7 @@ procedure DrawPolyLines(center: TVector2; sides: Integer; radius, rotation: Sing
 function LoadFontEx(const fileName: PAnsiChar; fontSize: Integer; codepoints: PInteger; codepointCount: Integer): TFont; cdecl; external 'raylib' name 'LoadFontEx';
 function GetFontDefault: TFont; cdecl; external 'raylib' name 'GetFontDefault';
 procedure UnloadFont(font: TFont); cdecl; external 'raylib' name 'UnloadFont';
-function IsFontReady(font: TFont): Boolean; cdecl; external 'raylib' name 'IsFontReady';
+function IsFontValid(font: TFont): Boolean; cdecl; external 'raylib' name 'IsFontValid';
 procedure DrawText(const text: PAnsiChar; posX, posY, fontSize: Integer; color: TColor); cdecl; external 'raylib' name 'DrawText';
 procedure DrawTextEx(font: TFont; const text: PAnsiChar; position: TVector2; fontSize, spacing: Single; tint: TColor); cdecl; external 'raylib' name 'DrawTextEx';
 function MeasureText(const text: PAnsiChar; fontSize: Integer): Integer; cdecl; external 'raylib' name 'MeasureText';

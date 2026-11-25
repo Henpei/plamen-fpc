@@ -6,7 +6,7 @@ Only touches src/*.pas. Idempotent-ish: lines already in a var section
 import re, sys, os
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-FILES = ["src/reg.pas", "src/sim.pas", "src/selftest.pas"]
+FILES = ["src/reg.pas", "src/sim.pas", "src/selftest.pas", "src/render.pas", "src/maps.pas"]
 
 INLINE_VAR = re.compile(r'^(\s*)var\s+(.+?);\s*$')
 FORVAR = re.compile(r'for\s+var\s+(\w+)\s*:=')
