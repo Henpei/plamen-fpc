@@ -15,46 +15,57 @@ bake-off against the QB64 implementation of the same vision).
   considered and rejected: raw X11 via fpc's x11 unit (manual blit + event loop,
   no benefit over raylib).
 
-## Rendering approach (v0.2 — TRUE 3D, per the revised contract §6)
+## Rendering approach (v0.3 — stylized low-poly 3D ARPG, Diablo-3-family target, per RENDER REBUILD 2)
 - Fixed-angle **orthographic 3D camera** via raylib `BeginMode3D`: classic 2:1
   dimetric (elevation atan(1/2) ≈ 26.565°, azimuth 45°), `up = +Z`,
   `camera.projection = CAMERA_ORTHOGRAPHIC`, `fovy` = ortho height in world
-  units (23). World coords: x east, y south, z up; one tile = 1×1 world unit.
-  Camera follows the player (+ optional shake offset).
-- **Real 3D geometry with textured surfaces.** One hand-built unit-cube mesh
-  (24 verts / 12 tris, CCW outward faces, uploaded with `UploadMesh`) is
-  scaled/rotated per draw call (`DrawMesh` + `MatrixTranslate/Scale/RotateZ`)
-  with per-material textures: per-tileset floor slabs and extruded wall boxes,
-  trunk + canopy boxes for trees, rock boxes, water slabs, glowing portal
-  columns. Tiles outside the ortho view range are culled. NOTE: raylib 6.2's
-  `GenMesh*` functions SIGFPE'd sporadically when called from Pascal (integer
-  div-by-zero inside the C lib; FPC unmasks FP exceptions), so no `GenMesh*`
-  is used — the cube is emitted vertex-by-vertex (`render.BuildCubeMesh`,
-  winding verified via screenshots).
-- **Textures: procedural-only, deterministic.** 64×64 images generated at
-  startup with a local xorshift (game RNG untouched): ground noise, brick,
-  rock, wood grain, water waves, glass streaks, snow — one set per tileset for
-  floor + wall, plus shared rock/trunk/canopy/water/portal/under-void
-  materials. Entity silhouettes are generated 64×64 billboard textures cached
-  per id. CC0 asset download was blocked by the sandbox network policy; the
-  brief explicitly allows procedural textures, so this is the deliberate,
-  documented pipeline (loader seam for future CC0 files: `LoadTexture`, already
-  bound; bundle under `assets/tex/` and credit in this README).
-- Characters/props are camera-facing billboards (`DrawBillboard`) over a ground
-  shadow disc; projectiles are glowing spheres; telegraphs are 3D ground discs
-  + rings (`DrawCircle3D`/`DrawLine3D`); the click-to-move marker is a fading
-  gold ground ring. The depth buffer handles occlusion (no painter sort in 3D).
-- After `EndMode3D`, a 2D pass draws names/HP bars/quest markers/damage numbers
-  via `GetWorldToScreen`. Mouse picking: `GetScreenToWorldRay` (raylib 6.x
-  name — `GetMouseRay` no longer exists) intersected with the z≈0 ground plane.
-- Color language (silhouette-first): player sky-blue, enemies element-colored,
-  boss maroon + horns, telegraph orange, loot/quest gold, NPC green, cursor
-  ring white/red/gold/green/gray by state.
-- HUD every frame: HP/MP/Stamina/XP bars, 8-slot quickbar, quest tracker, minimap,
-  gold/points, cursor-state label, and **build evidence:
+  units (20 at zoom 0). World coords: x east, y south, z up; one tile = 1×1
+  world unit. **3-step zoom** (mouse wheel / PgUp/PgDn / +/-) divides `fovy`
+  by 1.45 per step; **tilt toggle (T)** switches elevation 26.565° ↔ 38°.
+- **Terrain = per-tile height field**, coherent by design (per-tile noise reads
+  as rubble at iso zoom): hubs are a raised-rim town plateau (rim h=0.42, flat
+  bowl), areas/dungeons are broad terraced bands from two low-frequency sine
+  fields quantized to 3 levels (0 / 0.42 / 0.84). Every tile is a box from z=0
+  to its height → **extruded cliff faces at every step**; oriented **ramp
+  slabs** are placed at walkable transitions |Δh|>0.25; water tiles are sunken
+  flush channels. 6 painted procedural tilesets (floor + wall each).
+- **Lighting: real shadow map.** Custom GLSL: a DEPTH shader (encodes
+  `gl_FragCoord.z` into RGB) renders the scene from an ortho light camera into a
+  1024×1024 `RenderTexture`; the LIT shader does directional sun + ambient +
+  Blinn spec, samples the shadow map on texture slot 1 with slope-scaled bias.
+  Both passes draw the same scene via `DrawMeshS` (per-draw shader swap).
+- **Props and characters are real 3D meshes — no billboards, no sprite quads.**
+  Hand-built meshes (never `GenMesh*`, which SIGFPEs from FPC): unit cube,
+  low-poly sphere, cylinder, ground quad — all `UploadMesh`'d once.
+  Trees = trunk box + 2 canopy spheres; rocks = squashed spheres; portals =
+  base slab + glowing column + rotating cap. **Characters are primitive rigs**
+  (legs, torso, arms, head sphere, weapon, helm/robe/horns variants) with
+  per-class body plans (Hound is a hulking 1.32× tank, casters wear robes…),
+  animated: walk cycle (leg/arm swing + bob), attack swing, idle bob, death
+  fall; NPCs wander ambiently. Projectiles are glowing spheres.
+- **Telegraphs/click markers = additive glow decals** (radial-gradient quad,
+  `BLEND_ADDITIVE`) plus ground rings; damage numbers/names/HP bars stay in the
+  2D pass via `GetWorldToScreen`.
+- **Textures: procedural-only, deterministic** (network-fetched CC0 packs are
+  blocked in this environment; the brief allows procedural). 64×64 images
+  from a local xorshift (game RNG untouched): ground noise, brick, rock, wood,
+  water, glass, snow, cloth, radial glow — bilinear + repeat. CC0 bundling seam
+  for later: `assets/tex/` + credit here.
+- **Matrix convention (verified empirically)**: raylib `TMatrix` is row-major
+  (`v*M`); `MatrixMultiply(left,right)` applies **left first** — compose models
+  as `Scale * Rotate * Translate`. See AGENTS.md.
+- Mouse picking: `GetScreenToWorldRay` (6.x name) intersected with the local
+  ground plane (`TileH`).
+- Color language (silhouette-first): player blue, enemies element-colored,
+  boss maroon + horns, telegraph orange→red, loot/quest gold, NPC green.
+- HUD every frame: HP/MP/Stamina/XP bars, 8-slot quickbar, quest tracker,
+  minimap, gold/points, cursor-state label, and **build evidence:
   `PLAMEN <commit> | map=<id> "name" | region=.. act=.. | fps=.. | ents=..`**,
   always.
-
+- Acceptance screenshots (`./build/plamen shot`): `shot_hub.png` (hub, default
+  camera, rim elevation + walking NPCs), `shot_combat.png` (player mid-swing
+  vs monster, telegraph glow + ring), `shot_zoom.png` (same scene, max zoom —
+  model detail, lighting/shadows). All fully 3D.
 ## Architecture
 - Strict split: `core`, `data`, `reg`, `sim`, `maps`, `selftest` **never touch
   raylib**; only `render.pas` + `plamen.dpr` do. This is what makes
@@ -129,12 +140,15 @@ bake-off against the QB64 implementation of the same vision).
   price/trust/blockade rules, save round-trip + CRC tamper rejection, 12 build
   simulations, data-only monster/spell add.
 - `plamen shot` → scripted graphical smoke on X driving the real point-and-click
-  command path: title/chargen/hub/combat screenshots (`shot_*.png`);
-  `CmdMoveTo` marker visible in shot_hub, `CmdAttackEnt` chase+fight in
-  shot_combat (War-Banner killed, then player died, death rules fired — corpse +
-  lost XP), 60 FPS, HUD shows `PLAMEN <commit> | map=.. | region=.. act=.. | fps`.
-- Renderer verified visually: ortho 2:1 3D scene, textured tiles/walls/props,
-  billboards, telegraph decals (screenshots inspected, not just RC-checked).
+  command path: title/chargen/hub/combat/zoom screenshots (`shot_*.png`);
+  `CmdMoveTo` marker visible in shot_hub, `CmdAttackEnt` fight in shot_combat
+  with the monster's telegraph pinned (glow decal + range ring), same scene at
+  max zoom in shot_zoom, 60 FPS, HUD shows
+  `PLAMEN <commit> | map=.. | region=.. act=.. | fps` every frame.
+- Renderer verified visually (human-eye on the screenshots, not just RC):
+  heightfield terrain with cliffs/ramps, shadow-mapped lighting, 3D prop trees/
+  rocks/portals, primitive-mesh animated character rigs (no billboards/quads),
+  additive telegraph decals, damage numbers.
 - `DISPLAY= plamen` → loud fatal, RC=2.
 
 ## Status vs the brief
