@@ -78,6 +78,7 @@ const
   FLAG_WINDOW_RESIZABLE = $00000004;
   FLAG_MSAA_4X_HINT     = $00000020;
   FLAG_WINDOW_HIGHDPI   = $00002000;
+  FLAG_WINDOW_UNDECORATED = $00000008;
   // TraceLogLevel
   LOG_ALL = 0; LOG_TRACE = 1; LOG_DEBUG = 2; LOG_INFO = 3; LOG_WARNING = 4; LOG_ERROR = 5; LOG_FATAL = 6; LOG_NONE = 7;
   // TextureFilter
@@ -172,6 +173,16 @@ procedure SetWindowSize(width, height: Integer); cdecl; external 'raylib' name '
 procedure SetWindowMinSize(width, height: Integer); cdecl; external 'raylib' name 'SetWindowMinSize';
 procedure ToggleFullscreen; cdecl; external 'raylib' name 'ToggleFullscreen';
 function IsWindowFullscreen: Boolean; cdecl; external 'raylib' name 'IsWindowFullscreen';
+procedure SetWindowState(flags: LongWord); cdecl; external 'raylib' name 'SetWindowState';
+procedure ClearWindowState(flags: LongWord); cdecl; external 'raylib' name 'ClearWindowState';
+function IsWindowState(flags: LongWord): Boolean; cdecl; external 'raylib' name 'IsWindowState';
+function GetCurrentMonitor: Integer; cdecl; external 'raylib' name 'GetCurrentMonitor';
+function GetMonitorCount: Integer; cdecl; external 'raylib' name 'GetMonitorCount';
+function GetMonitorWidth(monitor: Integer): Integer; cdecl; external 'raylib' name 'GetMonitorWidth';
+function GetMonitorHeight(monitor: Integer): Integer; cdecl; external 'raylib' name 'GetMonitorHeight';
+procedure SetWindowMonitor(monitor: Integer); cdecl; external 'raylib' name 'SetWindowMonitor';
+function GetWindowPosition: TVector2; cdecl; external 'raylib' name 'GetWindowPosition';
+procedure SetWindowPosition(x, y: Integer); cdecl; external 'raylib' name 'SetWindowPosition';
 procedure TakeScreenshot(const fileName: PAnsiChar); cdecl; external 'raylib' name 'TakeScreenshot';
 function FileExists(const fileName: PAnsiChar): Boolean; cdecl; external 'raylib' name 'FileExists';
 function GetApplicationDirectory: PAnsiChar; cdecl; external 'raylib' name 'GetApplicationDirectory';

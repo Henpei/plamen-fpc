@@ -117,21 +117,27 @@ bake-off against the QB64 implementation of the same vision).
   (hub + 2 areas + dungeon) + alternate hub + world map = 22 maps, 5 stores,
   12 selftest-verified endgame builds, 10 NPCs with conditional dialog trees.
 
-## Controls (v0.2 — POINT-AND-CLICK is the primary scheme, per revised §4.6/4.12)
+## Controls (v0.3 — POINT-AND-CLICK ONLY, per revised §4.6/4.12; WASD/arrow movement deleted)
 - **LMB click = context order**: enemy → chase + attack; NPC/store/chest/lore/
   marker → walk there and act (acts immediately if already close); ground →
   click-to-move (fading gold ring marker at the click point). **Hold LMB on
-  ground = sweep-move** (marker follows the cursor).
+  ground = sweep-move** (marker follows the cursor). **There is no WASD/arrow
+  movement** — pointer orders are the only movement input.
 - **RMB** on enemy = attack; **hold RMB (or K) = block**; **SPACE = dodge-step**
   with i-frames toward facing. **1-8 = quickbar** aimed at the cursor.
 - Hover: cursor ring shows state — white `move`, red `attack`, gold `talk`,
   green `interact`, gray `--` unavailable (blocked/out of map) — plus the
   hovered entity's name.
-- Pure-keyboard path: **TAB** cycles targets nearest-first (purple ring),
-  **ENTER/J** acts on the selected target, **E** interacts nearest,
-  **WASD/arrows** remain only as an accessibility movement aid (never primary).
+- Pure-keyboard path (targeting/actions, not movement): **TAB** cycles targets
+  nearest-first (purple ring), **ENTER/J** acts on the selected target,
+  **E** interacts nearest.
 - I inventory · C character/build · Q quest log · L lore log · ESC pause ·
   F1 help · F3/F4/F5 toggles (shake, telegraphs, damage numbers) · F10 screenshot.
+- **Display**: window is resizable — projection/layout are computed from the
+  live window size every frame (no squish at any aspect). **Mouse wheel** zooms
+  the camera in 3 steps (PgUp/PgDn or +/- too), **T** toggles camera tilt,
+  **F11 or Alt+Enter** toggles windowed-fullscreen (borderless on the current
+  monitor via SetWindowMonitor) without restart.
 
 ## Verification evidence
 - `make selftest` → `plamen selftest` → **82 passed, 0 failed, RC=0**
@@ -145,6 +151,10 @@ bake-off against the QB64 implementation of the same vision).
   with the monster's telegraph pinned (glow decal + range ring), same scene at
   max zoom in shot_zoom, 60 FPS, HUD shows
   `PLAMEN <commit> | map=.. | region=.. act=.. | fps` every frame.
+- Display proofs in the same run: `shot_aspect43.png` (window resized to 4:3 —
+  native-res render, no squish), `shot_fullscreen.png` (F11/Alt+Enter
+  windowed-fullscreen via SetWindowMonitor, no restart), `shot_zoom1/2.png`
+  (wheel-zoom steps 1 and 2, camera math intact).
 - Renderer verified visually (human-eye on the screenshots, not just RC):
   heightfield terrain with cliffs/ramps, shadow-mapped lighting, 3D prop trees/
   rocks/portals, primitive-mesh animated character rigs (no billboards/quads),

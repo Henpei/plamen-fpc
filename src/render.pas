@@ -11,8 +11,19 @@ implementation
 uses SysUtils, Math, core, data, reg, sim, maps, raylib;
 
 const
-  SCREEN_W = 1280;
-  SCREEN_H = 720;
+  INIT_W = 1280;   // initial window size only — ALL layout/projection/culling math
+  INIT_H = 720;    // uses the LIVE window size (ScrW/ScrH) so nothing squishes at any resolution
+
+// live render-target size (window is resizable; fullscreen changes it too)
+function ScrW: Integer;
+begin
+  Result := GetScreenWidth();
+end;
+
+function ScrH: Integer;
+begin
+  Result := GetScreenHeight();
+end;
 
 type
   TGameState = (gsTitle, gsCharGen, gsGame, gsDeath);
@@ -28,6 +39,9 @@ var
   optShake, optTelegraph, optDmgNum: Boolean;
   shotMode: Boolean;
   shotFrame: Integer;
+  // windowed-fullscreen state (F11 / Alt+Enter)
+  gFullscreen: Boolean = False;
+  gPrevWX, gPrevWY, gPrevWW, gPrevWH, gPrevMon: Integer;
   // chargen
   cgName: string;
   cgRace, cgClass: Integer;
@@ -1029,7 +1043,7 @@ var
   tm: TMatrix;
 begin
   ts := TilesetIdx(GMap.tileset);
-  rng := curFovy * 0.5 * (1 + SCREEN_W / SCREEN_H) * 0.9 + 4;
+  rng := curFovy * 0.5 * (1 + ScrW / ScrH) * 0.9 + 4;
   x0 := ClampI(Trunc(GPlayer.x - rng), 0, GMap.w - 1);
   x1 := ClampI(Trunc(GPlayer.x + rng), 0, GMap.w - 1);
   y0 := ClampI(Trunc(GPlayer.y - rng), 0, GMap.h - 1);
@@ -1307,7 +1321,7 @@ begin
   EndMode3D;
   // ---- 2D label pass ----
   lastAnimT := animT;
-  ppu := SCREEN_H / curFovy;
+  ppu := ScrH / curFovy;
   for i := 0 to High(GEnts) do
   begin
     e := GEnts[i];
@@ -1402,7 +1416,7 @@ var
   ex, ey: Single;
 begin
   mw := 170; mh := 130;
-  x := SCREEN_W - mw - 10; y := 10;
+  x := ScrW - mw - 10; y := 10;
   DrawRectangle(x - 4, y - 4, mw + 8, mh + 8, Fade(BLACK, 0.7));
   for i := 0 to GMap.h - 1 do
     for xx := 0 to GMap.w - 1 do
@@ -1433,7 +1447,7 @@ var
   ccol: TColor;
   clab: string;
 begin
-  y0 := SCREEN_H - 96;
+  y0 := ScrH - 96;
   // bars
   DrawBar(10, y0, 240, GPlayer.hp / Max(1, GetStat(GPlayer, 'max_hp')), RED, 'HP ' + F2S(GPlayer.hp, 0) + '/' + F2S(GetStat(GPlayer, 'max_hp'), 0));
   DrawBar(10, y0 + 18, 240, GPlayer.mana / Max(1, GetStat(GPlayer, 'max_mana')), BLUE, 'MP ' + F2S(GPlayer.mana, 0) + '/' + F2S(GetStat(GPlayer, 'max_mana'), 0));
@@ -1479,12 +1493,12 @@ begin
       end;
     end;
   // build evidence: version + map + act/region + fps, EVERY frame
-  Text(10, SCREEN_H - 18, 13,
+  Text(10, ScrH - 18, 13,
     'PLAMEN ' + VERSION_STAMP + ' | map=' + GMap.id + ' "' + GMap.name + '" | region=' + RegionOfMap(GMap.id) +
     ' act=' + FlagGet(GPlayer.flags, 'act') + ' | fps=' + I2S(GetFPS()) + ' | ents=' + I2S(Length(GEnts)),
     GOLD);
   // message toast
-  if msgT > 0 then TextC(SCREEN_W div 2, 60, 18, msg, YELLOW);
+  if msgT > 0 then TextC(ScrW div 2, 60, 18, msg, YELLOW);
   DrawMinimap;
   // pointer cursor state (point-and-click): colored ring + label at cursor
   mw := GetMousePosition;
@@ -1512,9 +1526,9 @@ var
   sel: Integer;
 begin
   ClearBackground(BLACK);
-  TextC(SCREEN_W div 2, 120, 64, 'PLAMEN', GOLD);
-  TextC(SCREEN_W div 2, 200, 20, 'A hardcore high fantasy isometric action RPG', RAYWHITE);
-  TextC(SCREEN_W div 2, 226, 16, 'commit ' + VERSION_STAMP + '  built ' + BUILD_TIME, GRAY);
+  TextC(ScrW div 2, 120, 64, 'PLAMEN', GOLD);
+  TextC(ScrW div 2, 200, 20, 'A hardcore high fantasy isometric action RPG', RAYWHITE);
+  TextC(ScrW div 2, 226, 16, 'commit ' + VERSION_STAMP + '  built ' + BUILD_TIME, GRAY);
   items[0] := 'New Game';
   items[1] := 'Continue (autosave)';
   items[2] := 'Quit';
@@ -1526,12 +1540,12 @@ begin
   begin
     if (i = 1) and (Length(SaveSlots) = 0) then
     begin
-      TextC(SCREEN_W div 2, 304 + i * 40, 20, items[i] + ' (no save)', DARKGRAY);
+      TextC(ScrW div 2, 304 + i * 40, 20, items[i] + ' (no save)', DARKGRAY);
     end
     else
     begin
-      if i = sel then DrawRectangle(SCREEN_W div 2 - 100, 300 + i * 40, 200, 32, DARKGRAY);
-      TextC(SCREEN_W div 2, 304 + i * 40, 20, items[i], IIfC(i = sel, YELLOW, RAYWHITE));
+      if i = sel then DrawRectangle(ScrW div 2 - 100, 300 + i * 40, 200, 32, DARKGRAY);
+      TextC(ScrW div 2, 304 + i * 40, 20, items[i], IIfC(i = sel, YELLOW, RAYWHITE));
     end;
   end;
   if IsKeyPressed(KEY_ENTER) or IsKeyPressed(KEY_KP_ENTER) then
@@ -1566,7 +1580,7 @@ var
   labels: array[0..4] of string;
 begin
   ClearBackground(BLACK);
-  TextC(SCREEN_W div 2, 60, 40, 'CREATE CHARACTER', GOLD);
+  TextC(ScrW div 2, 60, 40, 'CREATE CHARACTER', GOLD);
   labels[0] := 'Name: ' + cgName + '_';
   labels[1] := 'Race: < ' + GRaces[cgRace].name + ' >';
   labels[2] := 'Class: < ' + GClasses[cgClass].name + ' >';
@@ -1600,12 +1614,12 @@ begin
   if (sel = 3) and IsKeyPressed(KEY_ENTER) then cgHardcore := not cgHardcore;
   for i := 0 to 4 do
   begin
-    if i = sel then DrawRectangle(SCREEN_W div 2 - 220, 140 + i * 44, 440, 36, DARKGRAY);
-    TextC(SCREEN_W div 2, 146 + i * 44, 20, labels[i], IIfC(i = sel, YELLOW, RAYWHITE));
+    if i = sel then DrawRectangle(ScrW div 2 - 220, 140 + i * 44, 440, 36, DARKGRAY);
+    TextC(ScrW div 2, 146 + i * 44, 20, labels[i], IIfC(i = sel, YELLOW, RAYWHITE));
   end;
   // descriptions
-  TextC(SCREEN_W div 2, 380, 14, GRaces[cgRace].desc, GRAY);
-  TextC(SCREEN_W div 2, 402, 14, GClasses[cgClass].desc, GRAY);
+  TextC(ScrW div 2, 380, 14, GRaces[cgRace].desc, GRAY);
+  TextC(ScrW div 2, 402, 14, GClasses[cgClass].desc, GRAY);
   if (sel = 4) and (IsKeyPressed(KEY_ENTER) or IsKeyPressed(KEY_KP_ENTER)) then
   begin
     if cgName = '' then cgName := 'Nameless';
@@ -1727,8 +1741,8 @@ var
   choiceCount: Integer;
   visibleChoices: array of string;
 begin
-  Panel(140, SCREEN_H - 320, SCREEN_W - 280, 300, 'Dialog — ' + dlgNpc);
-  y := SCREEN_H - 290;
+  Panel(140, ScrH - 320, ScrW - 280, 300, 'Dialog — ' + dlgNpc);
+  y := ScrH - 290;
   for i := 0 to High(dlgLines) do
   begin
     line := dlgLines[i];
@@ -1757,7 +1771,7 @@ begin
   end;
   if IsKeyPressed(KEY_DOWN) then dlgCursor := (dlgCursor + 1) mod choiceCount;
   if IsKeyPressed(KEY_UP) then dlgCursor := (dlgCursor + choiceCount - 1) mod choiceCount;
-  y := SCREEN_H - 120;
+  y := ScrH - 120;
   for i := 0 to High(visibleChoices) do
   begin
     kv := SplitStr(visibleChoices[i], '=>');
@@ -1792,7 +1806,7 @@ begin
   si := FindStore(GMap.store);
   if si < 0 then begin overlay := ovNone; Exit; end;
   st := GStores[si];
-  Panel(80, 60, SCREEN_W - 160, SCREEN_H - 140, st.name + '  (Compact trust: ' + FlagGet(GPlayer.flags, 'compact.trust') + ')  [Tab: buy/sell]  gold=' + I2S(GPlayer.gold));
+  Panel(80, 60, ScrW - 160, ScrH - 140, st.name + '  (Compact trust: ' + FlagGet(GPlayer.flags, 'compact.trust') + ')  [Tab: buy/sell]  gold=' + I2S(GPlayer.gold));
   if IsKeyPressed(KEY_TAB) then storeMode := 1 - storeMode;
   Text(100, 96, 16, IIfS2(storeMode = 0, 'BUY', 'SELL'), YELLOW);
   y := 126;
@@ -1803,7 +1817,7 @@ begin
     begin
       if not StoreStockVisible(GPlayer, st, i) then Continue;
       price := StorePrice(GPlayer, GMap.id, st.stock[i].itemId);
-      if i = storeCursor then DrawRectangle(96, y - 3, SCREEN_W - 200, 20, DARKGRAY);
+      if i = storeCursor then DrawRectangle(96, y - 3, ScrW - 200, 20, DARKGRAY);
       Text(104, y, 15, GItems[FindItem(st.stock[i].itemId)].name + '  x' + I2S(st.stock[i].qty) + '   ' + I2S(price) + 'g', IIfC(i = storeCursor, YELLOW, RAYWHITE));
       Inc(y, 22);
       Inc(n);
@@ -1814,7 +1828,7 @@ begin
   begin
     for i := 0 to High(GPlayer.inv) do
     begin
-      if i = storeCursor then DrawRectangle(96, y - 3, SCREEN_W - 200, 20, DARKGRAY);
+      if i = storeCursor then DrawRectangle(96, y - 3, ScrW - 200, 20, DARKGRAY);
       Text(104, y, 15, GPlayer.inv[i].name + '   sell ' + I2S(SellPrice(GPlayer, GMap.id, GPlayer.inv[i])) + 'g', IIfC(i = storeCursor, YELLOW, RAYWHITE));
       Inc(y, 22);
       Inc(n);
@@ -1863,12 +1877,12 @@ begin
       end;
     end;
   end;
-  Text(100, SCREEN_H - 120, 14, 'ENTER buy/sell — ESC close', GRAY);
+  Text(100, ScrH - 120, 14, 'ENTER buy/sell — ESC close', GRAY);
   // mouse click support
   mx := GetMousePosition; click := IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
   if click then
   begin
-    if (mx.y > 120) and (mx.y < y) and (mx.x > 96) and (mx.x < SCREEN_W - 104) then
+    if (mx.y > 120) and (mx.y < y) and (mx.x > 96) and (mx.x < ScrW - 104) then
       storeCursor := ClampI(Round((mx.y - 126) / 22), 0, n - 1);
   end;
 end;
@@ -1883,7 +1897,7 @@ var
   it: TItemInst;
   equipped: TItemInst;
 begin
-  Panel(60, 50, 640, SCREEN_H - 120, 'INVENTORY  (ENTER equip, ESC close)  carry ' + I2S(Length(GPlayer.inv)) + '/' + F2S(GetStat(GPlayer, 'carry'), 0));
+  Panel(60, 50, 640, ScrH - 120, 'INVENTORY  (ENTER equip, ESC close)  carry ' + I2S(Length(GPlayer.inv)) + '/' + F2S(GetStat(GPlayer, 'carry'), 0));
   y := 86;
   for i := 0 to High(GPlayer.inv) do
   begin
@@ -1946,7 +1960,7 @@ var
   i, y: Integer;
   si: Integer;
 begin
-  Panel(60, 50, SCREEN_W - 120, SCREEN_H - 120, 'CHARACTER — ' + GPlayer.name + '  ' + GRaces[FindRace(GPlayer.raceId)].name + ' ' + GClasses[FindClass(GPlayer.classId)].name + '  lv ' + I2S(GPlayer.level) + '  pts: attr ' + I2S(GPlayer.attrPoints) + ' skill ' + I2S(GPlayer.skillPoints));
+  Panel(60, 50, ScrW - 120, ScrH - 120, 'CHARACTER — ' + GPlayer.name + '  ' + GRaces[FindRace(GPlayer.raceId)].name + ' ' + GClasses[FindClass(GPlayer.classId)].name + '  lv ' + I2S(GPlayer.level) + '  pts: attr ' + I2S(GPlayer.attrPoints) + ' skill ' + I2S(GPlayer.skillPoints));
   y := 90;
   for i := 0 to 4 do
   begin
@@ -1965,7 +1979,7 @@ begin
   begin
     Text(80, y, 13, GStats[FindStat(GPlayer.statCache[i].id)].name + ': ' + F2S(GPlayer.statCache[i].val, 1), RAYWHITE);
     Inc(y, 17);
-    if y > SCREEN_H - 200 then Break;
+    if y > ScrH - 200 then Break;
   end;
   // skills
   Text(560, 90, 14, '--- skill trees (ENTER buy if affordable & prereq) ---', GOLD);
@@ -1979,8 +1993,8 @@ begin
         if GPlayer.skills[i] = GSkills[si].id then taken := True;
       if not taken then
       begin
-        if y > SCREEN_H - 130 then Break;
-        if listCursor = si then DrawRectangle(556, y - 3, SCREEN_W - 640, 18, DARKGRAY);
+        if y > ScrH - 130 then Break;
+        if listCursor = si then DrawRectangle(556, y - 3, ScrW - 640, 18, DARKGRAY);
         Text(564, y, 13, GSkills[si].tree + ' T' + I2S(GSkills[si].tier) + ' ' + GSkills[si].name + ' (cost ' + I2S(GSkills[si].cost) + ', req ' + GSkills[si].requires + ')', IIfC(listCursor = si, YELLOW, GRAY));
         Inc(y, 18);
       end;
@@ -2027,7 +2041,7 @@ procedure DrawQuestLog;
 var
   i, y, qi, o: Integer;
 begin
-  Panel(60, 50, SCREEN_W - 120, SCREEN_H - 120, 'QUEST LOG (ESC close)');
+  Panel(60, 50, ScrW - 120, ScrH - 120, 'QUEST LOG (ESC close)');
   y := 86;
   for i := 0 to High(GPlayer.quests) do
   begin
@@ -2043,7 +2057,7 @@ begin
         Inc(y, 15);
       end;
     Inc(y, 6);
-    if y > SCREEN_H - 90 then Break;
+    if y > ScrH - 90 then Break;
   end;
 end;
 
@@ -2051,7 +2065,7 @@ procedure DrawLoreLog;
 var
   i, y, li, k: Integer;
 begin
-  Panel(60, 50, SCREEN_W - 120, SCREEN_H - 120, 'LORE LOG (ESC close) — reading is optional, the world does not force-feed');
+  Panel(60, 50, ScrW - 120, ScrH - 120, 'LORE LOG (ESC close) — reading is optional, the world does not force-feed');
   y := 86;
   for i := 0 to High(GPlayer.lore) do
   begin
@@ -2063,7 +2077,7 @@ begin
     Inc(y, 17);
     Text(96, y, 12, Copy(GLore[li].text, 1, 110), RAYWHITE);
     Inc(y, 22);
-    if y > SCREEN_H - 90 then Break;
+    if y > ScrH - 90 then Break;
   end;
 end;
 
@@ -2072,7 +2086,7 @@ var
   i: Integer;
   items: array[0..4] of string;
 begin
-  Panel(SCREEN_W div 2 - 200, 200, 400, 260, 'PAUSED');
+  Panel(ScrW div 2 - 200, 200, 400, 260, 'PAUSED');
   items[0] := 'Resume';
   items[1] := 'Save game (autosave slot)';
   items[2] := 'Toggles: shake=' + BoolToStr(optShake, True) + ' telegraphs=' + BoolToStr(optTelegraph, True) + ' dmgnum=' + BoolToStr(optDmgNum, True);
@@ -2082,8 +2096,8 @@ begin
   if IsKeyPressed(KEY_UP) then listCursor := (listCursor + 4) mod 5;
   for i := 0 to 4 do
   begin
-    if i = listCursor then DrawRectangle(SCREEN_W div 2 - 180, 240 + i * 36, 360, 30, DARKGRAY);
-    TextC(SCREEN_W div 2, 245 + i * 36, 16, items[i], IIfC(i = listCursor, YELLOW, RAYWHITE));
+    if i = listCursor then DrawRectangle(ScrW div 2 - 180, 240 + i * 36, 360, 30, DARKGRAY);
+    TextC(ScrW div 2, 245 + i * 36, 16, items[i], IIfC(i = listCursor, YELLOW, RAYWHITE));
   end;
   if IsKeyPressed(KEY_ENTER) or IsKeyPressed(KEY_KP_ENTER) then
   begin
@@ -2104,10 +2118,10 @@ var
   items: array[0..2] of string;
   cost: Integer;
 begin
-  DrawRectangle(0, 0, SCREEN_W, SCREEN_H, Fade(MAROON, 0.55));
-  TextC(SCREEN_W div 2, 140, 56, 'YOU DIED', RED);
-  TextC(SCREEN_W div 2, 210, 18, 'Death is punished. The world does not scale to you.', RAYWHITE);
-  TextC(SCREEN_W div 2, 236, 16, 'Lost XP on corpse: ' + I2S(GPlayer.lostXP) + IIfS2(GPlayer.corpseLooted, '  (corpse looted by monsters — a grave robber may have your things)', ''), GRAY);
+  DrawRectangle(0, 0, ScrW, ScrH, Fade(MAROON, 0.55));
+  TextC(ScrW div 2, 140, 56, 'YOU DIED', RED);
+  TextC(ScrW div 2, 210, 18, 'Death is punished. The world does not scale to you.', RAYWHITE);
+  TextC(ScrW div 2, 236, 16, 'Lost XP on corpse: ' + I2S(GPlayer.lostXP) + IIfS2(GPlayer.corpseLooted, '  (corpse looted by monsters — a grave robber may have your things)', ''), GRAY);
   cost := GPlayer.level * 50;
   items[0] := 'Run to your corpse (recover the XP)';
   items[1] := 'Dagny resurrect at hub (' + I2S(cost) + 'g)';
@@ -2116,8 +2130,8 @@ begin
   if IsKeyPressed(KEY_UP) then listCursor := (listCursor + 2) mod 3;
   for i := 0 to 2 do
   begin
-    if i = listCursor then DrawRectangle(SCREEN_W div 2 - 260, 300 + i * 44, 520, 36, DARKGRAY);
-    TextC(SCREEN_W div 2, 306 + i * 44, 19, items[i], IIfC(i = listCursor, YELLOW, RAYWHITE));
+    if i = listCursor then DrawRectangle(ScrW div 2 - 260, 300 + i * 44, 520, 36, DARKGRAY);
+    TextC(ScrW div 2, 306 + i * 44, 19, items[i], IIfC(i = listCursor, YELLOW, RAYWHITE));
   end;
   if IsKeyPressed(KEY_ENTER) or IsKeyPressed(KEY_KP_ENTER) then
   begin
@@ -2164,10 +2178,10 @@ end;
 
 procedure DrawHelp;
 begin
-  Panel(120, 60, SCREEN_W - 240, SCREEN_H - 140, 'HELP / KEYBINDS');
+  Panel(120, 60, ScrW - 240, ScrH - 140, 'HELP / KEYBINDS');
   Text(140, 96, 15, 'LMB click: move / attack enemy / talk-interact (context). Hold LMB on ground = sweep-move (gold ring marker).', RAYWHITE);
   Text(140, 120, 15, 'RMB on enemy = attack, hold RMB or K = block. SPACE = dodge-step (i-frames). 1-8 = quickbar aimed at cursor.', RAYWHITE);
-  Text(140, 144, 15, 'Keyboard path: TAB cycle targets, ENTER/J act, E interact nearest, WASD/arrows = accessibility move only. I C Q L F1 panels, ESC pause.', RAYWHITE);
+  Text(140, 144, 15, 'Keyboard path: TAB cycle targets, ENTER/J act, E interact nearest. I C Q L F1 panels, ESC pause. F11/Alt+Enter fullscreen, wheel zoom.', RAYWHITE);
   Text(140, 168, 15, 'Cursor ring shows state: white=move red=attack gold=talk green=interact gray=unavailable. Hover shows target name.', RAYWHITE);
   Text(140, 176, 15, 'Walk onto gold portals (P) to travel. The world map connects the five regions. Wrong way = death. Intended.', GOLD);
   Text(140, 208, 15, 'Death: corpse-run, Dagny (gold), or reload. Corpses can be looted by monsters.', RAYWHITE);
@@ -2207,8 +2221,8 @@ end;
   ground -> click-to-move (gold ring indicator, hold LMB = sweep-move).
   RMB press on enemy = attack, RMB hold (or K) = block. SPACE = dodge-step
   (i-frames). 1-8 quickbar aimed at cursor. TAB cycles nearest targets, ENTER/J
-  acts on the keyboard target (pure-keyboard path); WASD/arrows remain only as an
-  accessibility movement aid, never primary. E = interact nearest. }
+  acts on the keyboard target (pure-keyboard path). E = interact nearest.
+  NO WASD/arrow movement — pointer orders only. }
 
 procedure ClearOrders;
 begin
@@ -2316,7 +2330,7 @@ begin
     cursorState := 4
   else
   begin
-    ppu := SCREEN_H / curFovy;
+    ppu := ScrH / curFovy;
     best := 1e9;
     for i := 0 to High(GEnts) do
     begin
@@ -2349,7 +2363,7 @@ end;
 
 procedure UpdateGame(dt: Single);
 var
-  dx, dy, sp, nx, ny: Single;
+  sp, nx, ny: Single;
   i, j, n, tmp: Integer;
   mw: TVector2;
   portal: TPortal;
@@ -2399,21 +2413,10 @@ begin
   for i := 0 to QUICK_SLOTS - 1 do
     if IsKeyPressed(KEY_ONE + i) then CastQuickbar(GPlayer, i, mouseWX, mouseWY);
   // ---- keyboard path ----
-  // WASD/arrows: accessibility movement aid only (pointer is primary)
-  dx := Ord(IsKeyDown(KEY_D) or IsKeyDown(KEY_RIGHT)) - Ord(IsKeyDown(KEY_A) or IsKeyDown(KEY_LEFT));
-  dy := Ord(IsKeyDown(KEY_S) or IsKeyDown(KEY_DOWN)) - Ord(IsKeyDown(KEY_W) or IsKeyDown(KEY_UP));
-  if (dx <> 0) or (dy <> 0) then
-  begin
-    ClearOrders;
-    sp := Sqrt(dx * dx + dy * dy);
-    dx := dx / sp; dy := dy / sp;
-    sp := GetStat(GPlayer, 'move_speed');
-    nx := GPlayer.x + dx * sp * dt;
-    ny := GPlayer.y + dy * sp * dt;
-    if not IsBlocked(nx, GPlayer.y) then GPlayer.x := nx;
-    if not IsBlocked(GPlayer.x, ny) then GPlayer.y := ny;
-    GPlayer.facing := ArcTan2(dy, dx);
-  end;
+  // POINT-AND-CLICK ONLY: no WASD/arrow movement exists (deleted per contract —
+  // dead movement paths are a silent-fallback risk). Keyboard remains for
+  // targeting/actions/panels: TAB cycles nearest-first targets, ENTER/J acts,
+  // E interacts nearest, 1-8 quickbar, SPACE dodge, RMB/K block.
   // TAB cycles nearest-first targets (pure-keyboard targeting)
   if IsKeyPressed(KEY_TAB) then
   begin
@@ -2606,6 +2609,39 @@ begin
   if msgT > 0 then msgT := msgT - dt;
 end;
 
+// windowed-fullscreen toggle (borderless window covering the current monitor).
+// Works without restart; restores the exact previous window rect on exit.
+procedure ToggleWindowedFullscreen;
+var
+  m: Integer;
+begin
+  if not IsWindowReady then Exit;
+  if not gFullscreen then
+  begin
+    gPrevWW := GetScreenWidth();
+    gPrevWH := GetScreenHeight();
+    gPrevWX := Round(GetWindowPosition.x);
+    gPrevWY := Round(GetWindowPosition.y);
+    gPrevMon := GetCurrentMonitor();
+    m := gPrevMon;
+    SetWindowState(FLAG_WINDOW_UNDECORATED);
+    SetWindowMonitor(m);
+    SetWindowSize(GetMonitorWidth(m), GetMonitorHeight(m));
+    SetWindowPosition(0, 0);
+    gFullscreen := True;
+    Log('windowed-fullscreen ON: monitor ' + I2S(m) + ' ' + I2S(GetMonitorWidth(m)) + 'x' + I2S(GetMonitorHeight(m)));
+  end
+  else
+  begin
+    ClearWindowState(FLAG_WINDOW_UNDECORATED);
+    SetWindowMonitor(gPrevMon);
+    SetWindowSize(gPrevWW, gPrevWH);
+    SetWindowPosition(gPrevWX, gPrevWY);
+    gFullscreen := False;
+    Log('windowed-fullscreen OFF: restored ' + I2S(gPrevWW) + 'x' + I2S(gPrevWH) + ' @' + I2S(gPrevWX) + ',' + I2S(gPrevWY));
+  end;
+end;
+
 { ---------------- main ---------------- }
 
 procedure RunGame(shot: Boolean);
@@ -2623,7 +2659,7 @@ begin
   LoadAllData;
   SetTraceLogLevel(LOG_WARNING);
   SetConfigFlags(FLAG_WINDOW_RESIZABLE or FLAG_VSYNC_HINT);
-  InitWindow(SCREEN_W, SCREEN_H, PAnsiChar('PLAMEN ' + VERSION_STAMP));
+  InitWindow(INIT_W, INIT_H, PAnsiChar('PLAMEN ' + VERSION_STAMP));
   if not IsWindowReady then Fatal('raylib window init failed (no GL context?)');
   SetTargetFPS(60);
   SetExitKey(KEY_NULL);
@@ -2678,6 +2714,10 @@ begin
     end;
     // global escape
     if IsKeyPressed(KEY_F10) then TakeScreenshot('shot.png');
+    // windowed-fullscreen toggle: F11 or Alt+Enter, any state, no restart
+    if IsKeyPressed(KEY_F11) or
+       (((IsKeyDown(KEY_LEFT_ALT)) or (IsKeyDown(KEY_RIGHT_ALT))) and IsKeyPressed(KEY_ENTER)) then
+      ToggleWindowedFullscreen;
     EndDrawing;
     Inc(frame);
     if shotMode then
@@ -2692,9 +2732,23 @@ begin
         state := gsGame;
       end;
       if (frame = 148) then CmdMoveTo(GPlayer.x + 2.5, GPlayer.y + 1.5); // click-move indicator demo
-      if (frame = 150) then TakeScreenshot('shot_hub.png');
-      if (frame = 151) then EnterMap('emberfall_area1', -1, -1);
-      if frame > 151 then
+      if (frame = 150) then TakeScreenshot('shot_hub.png');           // 16:9 1280x720
+      // item 5 proof: non-16:9 window, native-res render, no squish
+      if (frame = 152) then SetWindowSize(1152, 864);                  // 4:3
+      if (frame = 162) then TakeScreenshot('shot_aspect43.png');
+      if (frame = 164) then SetWindowSize(INIT_W, INIT_H);             // back to 16:9
+      // item 6 proof: windowed-fullscreen toggle without restart (F11/Alt+Enter path)
+      if (frame = 170) then ToggleWindowedFullscreen;
+      if (frame = 180) then TakeScreenshot('shot_fullscreen.png');
+      if (frame = 182) then ToggleWindowedFullscreen;                  // back to windowed
+      // item 7 proof: zoom steps 1 and 2, camera math intact at each step
+      if (frame = 190) then zoomLevel := 1;
+      if (frame = 196) then TakeScreenshot('shot_zoom1.png');
+      if (frame = 198) then zoomLevel := 2;
+      if (frame = 204) then TakeScreenshot('shot_zoom2.png');
+      if (frame = 206) then zoomLevel := 0;
+      if (frame = 210) then EnterMap('emberfall_area1', -1, -1);
+      if frame > 210 then
       begin
         // drive the real point-and-click path: click the nearest monster, keep swinging
         bi := -1; bd := 1e9;
