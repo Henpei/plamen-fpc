@@ -1,0 +1,7 @@
+build/
+saves/
+selftest.log
+error.log
+*.o
+*.ppu
+src/version.inc
