@@ -938,6 +938,18 @@ begin
   DrawMeshS(gQuad, gMatGlow, tm);
 end;
 
+{ ================= facing: world movement angle -> rig rotation =================
+  The rig MODEL faces local -y (chest depth 0.22 in y, shoulders/arms spread along
+  x, weapon in the right hand at -x). The iso camera (UpdateCamera) projects world
+  ground dir (wx,wy) to screen space as  sx = (wy-wx)/sqrt(2),
+  sy_down = (wx+wy)*sin(phi)/sqrt(2)  — a linear map, so rotating the rig in the
+  world plane by the movement angle atan2(wy,wx) points it along the projected
+  screen direction. RotateZ(f + Pi/2) maps local -y onto (cos f, sin f). }
+function FacingDrawRot(facing: Single): Single;
+begin
+  Result := facing + Pi / 2;
+end;
+
 { ================= body plans / character rigs ================= }
 
 function BodyPlan(const classId: string): TBodyPlan;
@@ -1189,7 +1201,7 @@ begin
       wy := e.y + Sin(animT * 0.35 + efx^.seed) * 0.35;
       moving := True;
     end;
-    base := MatrixMultiply(MatrixRotateZ(e.facing), MatrixTranslate(wx, wy, gh));
+    base := MatrixMultiply(MatrixRotateZ(FacingDrawRot(e.facing)), MatrixTranslate(wx, wy, gh));
     case e.kind of
       ekMonster:
         begin
@@ -1233,7 +1245,7 @@ begin
     end;
     if GPlayer.atkCd > 0.1 then pFxAtk := 1 - GPlayer.atkCd / 0.45 else pFxAtk := Max(0, pFxAtk - dt * 3.2);
     plan := BodyPlan(GPlayer.classId);
-    base := MatrixMultiply(MatrixRotateZ(GPlayer.facing), MatrixTranslate(GPlayer.x, GPlayer.y, TileH(Trunc(GPlayer.x), Trunc(GPlayer.y))));
+    base := MatrixMultiply(MatrixRotateZ(FacingDrawRot(GPlayer.facing)), MatrixTranslate(GPlayer.x, GPlayer.y, TileH(Trunc(GPlayer.x), Trunc(GPlayer.y))));
     DrawRig(base, plan, MkCol(70, 130, 220), MkCol(240, 210, 170), pFxPhase, pFxAtk, 0,
       (hasMove or (attackTgt >= 0) or (interactTgt >= 0)) and (PointDist(GPlayer.x, GPlayer.y, lastPX, lastPY) > 0.001), False);
   end
@@ -2730,6 +2742,17 @@ begin
         NewPlayer(GPlayer, cgName, GRaces[cgRace].id, GClasses[cgClass].id, cgHardcore);
         EnterMap('cinderhold', -1, -1);
         state := gsGame;
+      end;
+      // facing verification: walk in all 8 directions (world angle d*45deg),
+      // screenshot each mid-walk. Screen mapping: d0=down-left d1=down d2=down-right
+      // d3=screen-right d4=up-right d5=up d6=up-left d7=left
+      if (frame >= 70) and (frame < 150) then
+      begin
+        if ((frame - 70) mod 10) = 0 then
+          CmdMoveTo(GPlayer.x + Cos((frame - 70) div 10 * Pi / 4) * 3,
+                    GPlayer.y + Sin((frame - 70) div 10 * Pi / 4) * 3);
+        if ((frame - 70) mod 10) = 7 then
+          TakeScreenshot(PAnsiChar('shot_dir' + I2S((frame - 70) div 10) + '.png'));
       end;
       if (frame = 148) then CmdMoveTo(GPlayer.x + 2.5, GPlayer.y + 1.5); // click-move indicator demo
       if (frame = 150) then TakeScreenshot('shot_hub.png');           // 16:9 1280x720
