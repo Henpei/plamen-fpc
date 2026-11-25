@@ -185,6 +185,15 @@ var
   lastMX, lastMY: Single;
   hoverEnt: Integer = -1;
   cursorState: Integer = 0; // 0=move 1=attack 2=talk 3=interact 4=unavailable
+  // point-and-click order state
+  moveTX, moveTY: Single;
+  hasMove: Boolean = False;
+  attackTgt: Integer = -1;
+  interactTgt: Integer = -1;
+  kbTgt: Integer = -1;
+  kbSel: Integer = 0;
+  kbList: array of Integer;
+  stuckX, stuckY, stuckT: Single;
 
 function ElemCol(const elem: string): TColor; forward;
 function HasQuestFor(const npcId: string): Boolean; forward;
@@ -754,6 +763,11 @@ begin
       r := 0.45 * ppu;
       DrawCircleLinesV(MkV(sp.x, sp.y - 8), r, GOLD);
     end;
+    if i = kbTgt then
+    begin
+      r := 0.55 * ppu;
+      DrawCircleLinesV(MkV(sp.x, sp.y - 8), r, PURPLE);
+    end;
   end;
   if not GPlayer.dead then
   begin
@@ -836,6 +850,9 @@ var
   qi: Integer;
   sp: TSpell;
   si: Integer;
+  mw: TVector2;
+  ccol: TColor;
+  clab: string;
 begin
   y0 := SCREEN_H - 96;
   // bars
@@ -890,6 +907,19 @@ begin
   // message toast
   if msgT > 0 then TextC(SCREEN_W div 2, 60, 18, msg, YELLOW);
   DrawMinimap;
+  // pointer cursor state (point-and-click): colored ring + label at cursor
+  mw := GetMousePosition;
+  case cursorState of
+    1: begin ccol := RED; clab := 'attack'; end;
+    2: begin ccol := GOLD; clab := 'talk'; end;
+    3: begin ccol := GREEN; clab := 'interact'; end;
+    4: begin ccol := DARKGRAY; clab := '--'; end;
+  else begin ccol := RAYWHITE; clab := 'move'; end;
+  end;
+  DrawRing(mw, 9, 12, 0, 360, 24, ccol);
+  Text(Round(mw.x) + 16, Round(mw.y) + 10, 12, clab, ccol);
+  if (hoverEnt >= 0) and (hoverEnt <= High(GEnts)) then
+    Text(Round(mw.x) + 16, Round(mw.y) + 24, 12, GEnts[hoverEnt].name, RAYWHITE);
 end;
 
 { ---------------- screens ---------------- }
@@ -1556,9 +1586,10 @@ end;
 procedure DrawHelp;
 begin
   Panel(120, 60, SCREEN_W - 240, SCREEN_H - 140, 'HELP / KEYBINDS');
-  Text(140, 96, 15, 'WASD/arrows move   mouse aims   J or LMB attack (combo)   K hold block   SPACE/RMB dodge (i-frames)', RAYWHITE);
-  Text(140, 120, 15, '1-8 quickbar (attack + spells)   E interact/talk   I inventory   C character/build   Q quest log   L lore', RAYWHITE);
-  Text(140, 144, 15, 'ESC pause   F3 shake  F4 telegraphs  F5 damage numbers   F10 screenshot   pure keyboard works: facing follows movement', RAYWHITE);
+  Text(140, 96, 15, 'LMB click: move / attack enemy / talk-interact (context). Hold LMB on ground = sweep-move (gold ring marker).', RAYWHITE);
+  Text(140, 120, 15, 'RMB on enemy = attack, hold RMB or K = block. SPACE = dodge-step (i-frames). 1-8 = quickbar aimed at cursor.', RAYWHITE);
+  Text(140, 144, 15, 'Keyboard path: TAB cycle targets, ENTER/J act, E interact nearest, WASD/arrows = accessibility move only. I C Q L F1 panels, ESC pause.', RAYWHITE);
+  Text(140, 168, 15, 'Cursor ring shows state: white=move red=attack gold=talk green=interact gray=unavailable. Hover shows target name.', RAYWHITE);
   Text(140, 176, 15, 'Walk onto gold portals (P) to travel. The world map connects the five regions. Wrong way = death. Intended.', GOLD);
   Text(140, 208, 15, 'Death: corpse-run, Dagny (gold), or reload. Corpses can be looted by monsters.', RAYWHITE);
   Text(140, 240, 15, 'Stores are run by the Gilded Compact: prices follow your trust and consequence flags.', RAYWHITE);
@@ -1574,6 +1605,7 @@ begin
   LoadMap(id);
   GMapId := id;
   GPlayer.mapId := id;
+  hasMove := False; attackTgt := -1; interactTgt := -1; kbTgt := -1; moveMarks := nil;
   if (tx >= 0) and (ty >= 0) then
   begin
     GPlayer.x := tx + 0.5;
@@ -1590,25 +1622,210 @@ begin
   if SaveGame(GPlayer, 'autosave', err) then Log('autosave ok') else Log('autosave FAILED: ' + err);
 end;
 
-{ ---------------- game update ---------------- }
+{ ---------------- point-and-click input layer ----------------
+  PRIMARY control: pointer-driven (Diablo/PoE style). LMB click = context order:
+  enemy -> chase+attack, interactable -> walk-then-act (or act now if close),
+  ground -> click-to-move (gold ring indicator, hold LMB = sweep-move).
+  RMB press on enemy = attack, RMB hold (or K) = block. SPACE = dodge-step
+  (i-frames). 1-8 quickbar aimed at cursor. TAB cycles nearest targets, ENTER/J
+  acts on the keyboard target (pure-keyboard path); WASD/arrows remain only as an
+  accessibility movement aid, never primary. E = interact nearest. }
+
+procedure ClearOrders;
+begin
+  hasMove := False;
+  attackTgt := -1;
+  interactTgt := -1;
+end;
+
+function FindWalkable(var x, y: Single): Boolean;
+var
+  r, a: Integer;
+  aa, nx, ny: Single;
+begin
+  if not IsBlocked(x, y) then Exit(True);
+  for r := 1 to 5 do
+    for a := 0 to 11 do
+    begin
+      aa := a / 12 * 2 * Pi;
+      nx := x + Cos(aa) * r * 0.5;
+      ny := y + Sin(aa) * r * 0.5;
+      if (nx >= 0.2) and (ny >= 0.2) and (nx < GMap.w - 0.2) and (ny < GMap.h - 0.2) and (not IsBlocked(nx, ny)) then
+      begin
+        x := nx; y := ny;
+        Exit(True);
+      end;
+    end;
+  Result := False;
+end;
+
+procedure CmdMoveTo(x, y: Single);
+var
+  tx, ty: Single;
+begin
+  tx := ClampF(x, 0.2, GMap.w - 0.2);
+  ty := ClampF(y, 0.2, GMap.h - 0.2);
+  if not FindWalkable(tx, ty) then Exit; // blocked: cursor shows 'unavailable', no order
+  moveTX := tx; moveTY := ty;
+  hasMove := True;
+  attackTgt := -1;
+  interactTgt := -1;
+  SetLength(moveMarks, Length(moveMarks) + 1);
+  moveMarks[High(moveMarks)].x := tx;
+  moveMarks[High(moveMarks)].y := ty;
+  moveMarks[High(moveMarks)].t := 0.6;
+end;
+
+procedure CmdAttackEnt(i: Integer);
+begin
+  attackTgt := i;
+  interactTgt := -1;
+  hasMove := False;
+end;
+
+procedure CmdInteractEnt(i: Integer);
+begin
+  interactTgt := i;
+  attackTgt := -1;
+  hasMove := False;
+end;
+
+procedure ActOnEnt(i: Integer);
+var
+  e: TEnt;
+begin
+  if (i < 0) or (i > High(GEnts)) then Exit;
+  e := GEnts[i];
+  case e.kind of
+    ekNpc: OpenDialog(e.id);
+    ekStore: OpenStore(e.id);
+    ekMarker, ekChest, ekLore, ekCorpse: InteractAt(GPlayer, e.x, e.y);
+  end;
+end;
+
+procedure WalkToward(tx, ty, dt: Single);
+var
+  sp, d, nx, ny: Single;
+begin
+  d := PointDist(GPlayer.x, GPlayer.y, tx, ty);
+  if d < 1e-4 then Exit;
+  sp := GetStat(GPlayer, 'move_speed') * dt;
+  nx := GPlayer.x + (tx - GPlayer.x) / d * sp;
+  ny := GPlayer.y + (ty - GPlayer.y) / d * sp;
+  if not IsBlocked(nx, GPlayer.y) then GPlayer.x := nx;
+  if not IsBlocked(GPlayer.x, ny) then GPlayer.y := ny;
+  GPlayer.facing := ArcTan2(ty - GPlayer.y, tx - GPlayer.x);
+end;
+
+procedure UpdateHover;
+var
+  mw: TVector2;
+  i: Integer;
+  best, d, r: Single;
+  sp: TVector2;
+  e: TEnt;
+  ppu: Single;
+begin
+  mw := GetMousePosition;
+  MouseToWorld(mw.x, mw.y, mouseWX, mouseWY);
+  lastMX := mw.x; lastMY := mw.y;
+  mouseActive := True;
+  GPlayer.facing := ArcTan2(mouseWY - GPlayer.y, mouseWX - GPlayer.x);
+  hoverEnt := -1;
+  cursorState := 0;
+  if (mouseWX < 0) or (mouseWY < 0) or (mouseWX >= GMap.w) or (mouseWY >= GMap.h) then
+    cursorState := 4
+  else
+  begin
+    ppu := SCREEN_H / CAM_FOVY;
+    best := 1e9;
+    for i := 0 to High(GEnts) do
+    begin
+      e := GEnts[i];
+      if not e.alive then Continue;
+      if e.kind = ekProjectile then Continue;
+      if (e.kind in [ekChest, ekLore, ekMarker]) and e.used then Continue;
+      sp := GetWorldToScreen(V3(e.x, e.y, 0.12), cam3);
+      r := (0.4 + e.size * 0.25) * ppu;
+      if e.boss then r := r * 1.5;
+      d := PointDist(mw.x, mw.y, sp.x, sp.y - 8);
+      if (d < r + 6) and (d < best) then
+      begin
+        best := d;
+        hoverEnt := i;
+      end;
+    end;
+    if hoverEnt >= 0 then
+    begin
+      e := GEnts[hoverEnt];
+      case e.kind of
+        ekMonster: cursorState := 1;
+        ekNpc: cursorState := 2;
+      else cursorState := 3;
+      end;
+    end
+    else if IsBlocked(mouseWX, mouseWY) then cursorState := 4;
+  end;
+end;
 
 procedure UpdateGame(dt: Single);
 var
   dx, dy, sp, nx, ny: Single;
-  i: Integer;
-  aimX, aimY: Single;
+  i, j, n, tmp: Integer;
   mw: TVector2;
   portal: TPortal;
   nearest, nd: Integer;
   e: TEnt;
+  d: Single;
 begin
   if overlay <> ovNone then Exit;
   if GPlayer.dead then begin state := gsDeath; listCursor := 0; Exit; end;
-  // movement
+  UpdateHover;
+  // ---- pointer orders ----
+  if IsMouseButtonPressed(MOUSE_BUTTON_LEFT) then
+  begin
+    if hoverEnt >= 0 then
+    begin
+      e := GEnts[hoverEnt];
+      d := PointDist(GPlayer.x, GPlayer.y, e.x, e.y);
+      if e.kind = ekMonster then
+        CmdAttackEnt(hoverEnt)
+      else if d < 2.2 then
+        ActOnEnt(hoverEnt)
+      else
+        CmdInteractEnt(hoverEnt);
+    end
+    else
+      CmdMoveTo(mouseWX, mouseWY);
+  end;
+  // hold LMB on ground = sweep-move
+  if IsMouseButtonDown(MOUSE_BUTTON_LEFT) and (attackTgt < 0) and (interactTgt < 0) and (hoverEnt < 0) then
+    if hasMove and (PointDist(mouseWX, mouseWY, moveTX, moveTY) > 0.35) then
+      CmdMoveTo(mouseWX, mouseWY);
+  // RMB: press on enemy = attack; hold = block (K also blocks)
+  if IsMouseButtonPressed(MOUSE_BUTTON_RIGHT) and (hoverEnt >= 0) and (GEnts[hoverEnt].kind = ekMonster) then
+    CmdAttackEnt(hoverEnt);
+  GPlayer.blockHeld := IsMouseButtonDown(MOUSE_BUTTON_RIGHT) or IsKeyDown(KEY_K);
+  // dodge-step (i-frames), toward facing
+  if IsKeyPressed(KEY_SPACE) then
+  begin
+    nx := GPlayer.x + Cos(GPlayer.facing) * 1.1;
+    ny := GPlayer.y + Sin(GPlayer.facing) * 1.1;
+    if not IsBlocked(nx, GPlayer.y) then GPlayer.x := nx;
+    if not IsBlocked(GPlayer.x, ny) then GPlayer.y := ny;
+    GPlayer.dodgeT := 0.28;
+    ClearOrders;
+  end;
+  // quickbar 1-8, aimed at cursor
+  for i := 0 to QUICK_SLOTS - 1 do
+    if IsKeyPressed(KEY_ONE + i) then CastQuickbar(GPlayer, i, mouseWX, mouseWY);
+  // ---- keyboard path ----
+  // WASD/arrows: accessibility movement aid only (pointer is primary)
   dx := Ord(IsKeyDown(KEY_D) or IsKeyDown(KEY_RIGHT)) - Ord(IsKeyDown(KEY_A) or IsKeyDown(KEY_LEFT));
   dy := Ord(IsKeyDown(KEY_S) or IsKeyDown(KEY_DOWN)) - Ord(IsKeyDown(KEY_W) or IsKeyDown(KEY_UP));
   if (dx <> 0) or (dy <> 0) then
   begin
+    ClearOrders;
     sp := Sqrt(dx * dx + dy * dy);
     dx := dx / sp; dy := dy / sp;
     sp := GetStat(GPlayer, 'move_speed');
@@ -1616,63 +1833,166 @@ begin
     ny := GPlayer.y + dy * sp * dt;
     if not IsBlocked(nx, GPlayer.y) then GPlayer.x := nx;
     if not IsBlocked(GPlayer.x, ny) then GPlayer.y := ny;
-    if not mouseActive then GPlayer.facing := ArcTan2(dy, dx);
+    GPlayer.facing := ArcTan2(dy, dx);
   end;
-  // mouse aim (3D ray pick onto ground plane)
-  mw := GetMousePosition;
-  if (Abs(mw.x - lastMX) > 0.5) or (Abs(mw.y - lastMY) > 0.5) or IsMouseButtonPressed(MOUSE_BUTTON_LEFT) or IsMouseButtonPressed(MOUSE_BUTTON_RIGHT) then
+  // TAB cycles nearest-first targets (pure-keyboard targeting)
+  if IsKeyPressed(KEY_TAB) then
   begin
-    mouseActive := True;
-    MouseToWorld(mw.x, mw.y, mouseWX, mouseWY);
-    GPlayer.facing := ArcTan2(mouseWY - GPlayer.y, mouseWX - GPlayer.x);
+    n := 0;
+    kbList := nil;
+    for i := 0 to High(GEnts) do
+    begin
+      e := GEnts[i];
+      if not e.alive then Continue;
+      if e.kind = ekProjectile then Continue;
+      if (e.kind in [ekChest, ekLore, ekMarker]) and e.used then Continue;
+      if (e.kind = ekMonster) or (e.kind in [ekNpc, ekStore, ekChest, ekLore, ekMarker, ekCorpse]) then
+      begin
+        SetLength(kbList, n + 1);
+        kbList[n] := i;
+        Inc(n);
+      end;
+    end;
+    for i := 1 to n - 1 do
+    begin
+      j := i;
+      while (j > 0) and (PointDist(GPlayer.x, GPlayer.y, GEnts[kbList[j]].x, GEnts[kbList[j]].y) <
+             PointDist(GPlayer.x, GPlayer.y, GEnts[kbList[j - 1]].x, GEnts[kbList[j - 1]].y)) do
+      begin
+        tmp := kbList[j]; kbList[j] := kbList[j - 1]; kbList[j - 1] := tmp;
+        Dec(j);
+      end;
+    end;
+    if n > 0 then
+    begin
+      kbSel := kbSel + 1;
+      if kbSel >= n then kbSel := 0;
+      kbTgt := kbList[kbSel];
+    end;
   end;
-  lastMX := mw.x; lastMY := mw.y;
-  aimX := GPlayer.x + Cos(GPlayer.facing) * 2;
-  aimY := GPlayer.y + Sin(GPlayer.facing) * 2;
-  if mouseActive then begin aimX := mouseWX; aimY := mouseWY; end;
-  // attack / block / dodge
-  if IsKeyPressed(KEY_J) or IsMouseButtonPressed(MOUSE_BUTTON_LEFT) then
+  // ENTER/J: act on keyboard target, else hovered, else nearest monster
+  if IsKeyPressed(KEY_ENTER) or IsKeyPressed(KEY_KP_ENTER) or IsKeyPressed(KEY_J) then
   begin
-    PlayerAttack(GPlayer, aimX, aimY);
-    if optShake then shake := 2;
+    i := kbTgt;
+    if i < 0 then i := hoverEnt;
+    if i < 0 then
+    begin
+      nearest := -1; nd := 6;
+      for j := 0 to High(GEnts) do
+        if (GEnts[j].kind = ekMonster) and GEnts[j].alive then
+          if PointDist(GPlayer.x, GPlayer.y, GEnts[j].x, GEnts[j].y) < nd then
+          begin
+            nd := Round(PointDist(GPlayer.x, GPlayer.y, GEnts[j].x, GEnts[j].y) * 10);
+            nearest := j;
+          end;
+      i := nearest;
+    end;
+    if i >= 0 then
+    begin
+      e := GEnts[i];
+      d := PointDist(GPlayer.x, GPlayer.y, e.x, e.y);
+      if e.kind = ekMonster then
+      begin
+        if d <= 1.7 + e.size + 0.4 then
+        begin
+          PlayerAttack(GPlayer, e.x, e.y);
+          if optShake then shake := 2;
+        end
+        else
+          CmdAttackEnt(i);
+      end
+      else if d < 2.2 then
+        ActOnEnt(i)
+      else
+        CmdInteractEnt(i);
+    end;
   end;
-  GPlayer.blockHeld := IsKeyDown(KEY_K);
-  if IsKeyPressed(KEY_SPACE) or IsMouseButtonPressed(MOUSE_BUTTON_RIGHT) then
-  begin
-    // dodge dash in facing dir with i-frames
-    nx := GPlayer.x + Cos(GPlayer.facing) * 1.1;
-    ny := GPlayer.y + Sin(GPlayer.facing) * 1.1;
-    if not IsBlocked(nx, GPlayer.y) then GPlayer.x := nx;
-    if not IsBlocked(GPlayer.x, ny) then GPlayer.y := ny;
-    GPlayer.dodgeT := 0.28;
-    if RaceFlag(GPlayer, 'dodge_chance') <> '' then ; // stat handled in DamagePlayer via dodge_chance? keep simple
-  end;
-  // quickbar
-  for i := 0 to QUICK_SLOTS - 1 do
-    if IsKeyPressed(KEY_ONE + i) then CastQuickbar(GPlayer, i, aimX, aimY);
-  // interact
+  // E: interact nearest
   if IsKeyPressed(KEY_E) then
   begin
     nearest := -1; nd := 2;
     for i := 0 to High(GEnts) do
     begin
       e := GEnts[i];
-      if e.alive and (e.kind in [ekNpc, ekMarker, ekChest, ekLore, ekStore]) then
+      if e.alive and (e.kind in [ekNpc, ekMarker, ekChest, ekLore, ekStore, ekCorpse]) then
         if PointDist(GPlayer.x, GPlayer.y, e.x, e.y) < nd then
         begin
           nd := Round(PointDist(GPlayer.x, GPlayer.y, e.x, e.y) * 10);
           nearest := i;
         end;
     end;
-    if nearest >= 0 then
+    if nearest >= 0 then ActOnEnt(nearest)
+    else
     begin
-      e := GEnts[nearest];
-      case e.kind of
-        ekNpc: OpenDialog(e.id);
-        ekStore: OpenStore(e.id);
-        ekMarker, ekChest, ekLore: InteractAt(GPlayer, e.x, e.y);
+      nearest := -1; nd := 1000000;
+      for i := 0 to High(GEnts) do
+      begin
+        e := GEnts[i];
+        if e.alive and (e.kind in [ekNpc, ekMarker, ekChest, ekLore, ekStore, ekCorpse]) then
+          if PointDist(GPlayer.x, GPlayer.y, e.x, e.y) < nd then
+          begin
+            nd := Round(PointDist(GPlayer.x, GPlayer.y, e.x, e.y));
+            nearest := i;
+          end;
       end;
+      if nearest >= 0 then CmdInteractEnt(nearest);
     end;
+  end;
+  // ---- execute movement orders ----
+  if attackTgt >= 0 then
+  begin
+    if (attackTgt > High(GEnts)) or (not GEnts[attackTgt].alive) or (GEnts[attackTgt].kind <> ekMonster) then
+      attackTgt := -1
+    else
+    begin
+      e := GEnts[attackTgt];
+      d := PointDist(GPlayer.x, GPlayer.y, e.x, e.y);
+      if d > 1.7 + e.size + 0.4 then
+        WalkToward(e.x, e.y, dt)
+      else
+      begin
+        GPlayer.facing := ArcTan2(e.y - GPlayer.y, e.x - GPlayer.x);
+        PlayerAttack(GPlayer, e.x, e.y);
+        if optShake then shake := 2;
+      end;
+      if d > 16 then attackTgt := -1; // leash
+    end;
+  end
+  else if interactTgt >= 0 then
+  begin
+    if (interactTgt > High(GEnts)) or (not GEnts[interactTgt].alive) then
+      interactTgt := -1
+    else
+    begin
+      e := GEnts[interactTgt];
+      d := PointDist(GPlayer.x, GPlayer.y, e.x, e.y);
+      if d < 2.0 then
+      begin
+        ActOnEnt(interactTgt);
+        interactTgt := -1;
+      end
+      else
+        WalkToward(e.x, e.y, dt);
+    end;
+  end
+  else if hasMove then
+  begin
+    d := PointDist(GPlayer.x, GPlayer.y, moveTX, moveTY);
+    if d < 0.25 then hasMove := False
+    else WalkToward(moveTX, moveTY, dt);
+  end;
+  // stuck detection: clear orders if we haven't moved
+  if (attackTgt >= 0) or (interactTgt >= 0) or hasMove then
+  begin
+    if PointDist(GPlayer.x, GPlayer.y, stuckX, stuckY) < 0.02 then stuckT := stuckT + dt else stuckT := 0;
+    stuckX := GPlayer.x; stuckY := GPlayer.y;
+    if stuckT > 0.9 then ClearOrders;
+  end;
+  // move markers fade
+  for i := High(moveMarks) downto 0 do
+  begin
+    moveMarks[i].t := moveMarks[i].t - dt;
+    if moveMarks[i].t <= 0 then Delete(moveMarks, i, 1);
   end;
   // overlays hotkeys
   if IsKeyPressed(KEY_I) then begin if overlay = ovInv then overlay := ovNone else begin overlay := ovInv; listCursor := 0; end; end;
@@ -1708,7 +2028,7 @@ var
   dt: Single;
   frame: Integer;
   bi, i: Integer;
-  bd, ex, ey, nx, ny: Single;
+  bd: Single;
 begin
   shotMode := shot;
   optShake := True; optTelegraph := True; optDmgNum := True;
@@ -1772,11 +2092,12 @@ begin
         EnterMap('cinderhold', -1, -1);
         state := gsGame;
       end;
+      if (frame = 148) then CmdMoveTo(GPlayer.x + 2.5, GPlayer.y + 1.5); // click-move indicator demo
       if (frame = 150) then TakeScreenshot('shot_hub.png');
       if (frame = 151) then EnterMap('emberfall_area1', -1, -1);
       if frame > 91 then
       begin
-        // walk toward nearest monster and attack
+        // drive the real point-and-click path: click the nearest monster once
         bi := -1; bd := 1e9;
         for i := 0 to High(GEnts) do
           if (GEnts[i].kind = ekMonster) and GEnts[i].alive then
@@ -1785,22 +2106,7 @@ begin
               bd := PointDist(GPlayer.x, GPlayer.y, GEnts[i].x, GEnts[i].y);
               bi := i;
             end;
-        if bi >= 0 then
-        begin
-          ex := GEnts[bi].x; ey := GEnts[bi].y;
-          GPlayer.facing := ArcTan2(ey - GPlayer.y, ex - GPlayer.x);
-          mouseWX := ex; mouseWY := ey; mouseActive := True;
-          if bd > 1.6 then
-          begin
-            nx := GPlayer.x + Cos(GPlayer.facing) * GetStat(GPlayer, 'move_speed') * dt;
-            ny := GPlayer.y + Sin(GPlayer.facing) * GetStat(GPlayer, 'move_speed') * dt;
-            if not IsBlocked(nx, GPlayer.y) then GPlayer.x := nx;
-            if not IsBlocked(GPlayer.x, ny) then GPlayer.y := ny;
-          end
-          else
-            PlayerAttack(GPlayer, ex, ey);
-          UpdateCombat(GPlayer, dt);
-        end;
+        if (bi >= 0) and (frame = 152) then CmdAttackEnt(bi);
         if frame = 400 then TakeScreenshot('shot_combat.png');
         if frame >= 430 then
         begin
