@@ -362,7 +362,7 @@ procedure RecalcStats(var p: TPlayer);
 var
   flats: array of TSymbol;
   syms: array of TSymbol;
-  i, si: Integer;
+  i, si, ci: Integer;
   base: Single;
 begin
   CollectFlats(p, flats);
@@ -404,6 +404,16 @@ begin
     p.statCache[High(p.statCache)].id := GStats[i].id;
     p.statCache[High(p.statCache)].val := base + FlatSum(flats, GStats[i].id);
   end;
+  // class stat multipliers from data/classes.dat (hp_mul/mana_mul/stam_mul) — wired in fix pass
+  ci := FindClass(p.classId);
+  if ci >= 0 then
+    for i := 0 to High(p.statCache) do
+      if p.statCache[i].id = 'max_hp' then
+        p.statCache[i].val := p.statCache[i].val * GClasses[ci].hpMul
+      else if p.statCache[i].id = 'max_mana' then
+        p.statCache[i].val := p.statCache[i].val * GClasses[ci].manaMul
+      else if p.statCache[i].id = 'max_stamina' then
+        p.statCache[i].val := p.statCache[i].val * GClasses[ci].stamMul;
 end;
 
 function GetStat(const p: TPlayer; const id: string): Single;

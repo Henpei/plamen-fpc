@@ -56,6 +56,9 @@ var
   gold: Integer;
   syms: array of TSymbol;
   savedSeeds: TStrArray;
+  ci: Integer;
+  savedMul, savedManaMul, savedStamMul: Single;
+  baseHp, baseMana, baseStam: Single;
 begin
   gPass := 0; gFail := 0; gLog := '';
   TLog('=== PLAMEN selftest commit=' + VERSION_STAMP + ' ===');
@@ -84,13 +87,14 @@ begin
     if GLore[i].hidden then Inc(j);
   Check(j >= 1, 'hidden endgame book exists');
 
-  { ---- 2. stat registry formulas ---- }
+  { ---- 2. stat registry formulas (incl. class muls, wired in fix pass) ---- }
   NewPlayer(p, 'Selftest', 'ashborn', 'wardancer', False);
-  Check(Abs(GetStat(p, 'max_hp') - (30 + 8 * 8 + 1 * 4)) < 0.001, 'formula max_hp = 30+might*8+level*4 (98)');
-  Check(Abs(GetStat(p, 'max_mana') - (10 + 8 * 7 + 8 * 2)) < 0.001, 'formula max_mana');
+  ci := FindClass('wardancer');
+  Check(Abs(GetStat(p, 'max_hp') - (30 + 8 * 8 + 1 * 4) * GClasses[ci].hpMul) < 0.001, 'formula max_hp = (30+might*8+level*4) * class hp_mul');
+  Check(Abs(GetStat(p, 'max_mana') - (10 + 8 * 7 + 8 * 2) * GClasses[ci].manaMul) < 0.001, 'formula max_mana = (10+spirit*7+wits*2) * class mana_mul');
   p.gear[4] := MakeItem('miner_gloves', 0, 1);  // hands: might=2
   RecalcStats(p);
-  Check(Abs(GetStat(p, 'max_hp') - (30 + 10 * 8 + 1 * 4)) < 0.001, 'gear flat might=2 raises max_hp to 114');
+  Check(Abs(GetStat(p, 'max_hp') - (30 + 10 * 8 + 1 * 4) * GClasses[ci].hpMul) < 0.001, 'gear flat might=2 raises max_hp (x class hp_mul)');
   syms := nil;
   Check(Abs(EvalFormula('2+3*4', syms) - 14) < 0.001, 'eval 2+3*4=14');
   Check(Abs(EvalFormula('(1+2)*3/2', syms) - 4.5) < 0.001, 'eval (1+2)*3/2=4.5');
@@ -281,6 +285,45 @@ begin
     Check(ok and (Length(p.skills) >= Length(GClasses[i].seedSkills)),
       Format('class %s grants its %d seed skills at chargen', [GClasses[i].id, Length(GClasses[i].seedSkills)]));
   end;
+
+  { ---- 13. class stat multipliers wired (hp_mul/mana_mul/stam_mul, fix pass) ---- }
+  NewPlayer(p, 'MulA', GRaces[0].id, 'wardancer', False);       // hp 0.95 mana 0.7 stam 1.2
+  NewPlayer(p2, 'MulB', GRaces[0].id, 'wardens_hound', False);  // hp 1.35 mana 0.6 stam 1.1
+  // strip kit gear so only the class mul differs (attrs are fixed at 8, same race)
+  for i := 0 to SLOT_COUNT - 1 do
+  begin
+    p.gear[i].base := '';
+    p2.gear[i].base := '';
+  end;
+  RecalcStats(p);
+  RecalcStats(p2);
+  Check(Abs(GetStat(p2, 'max_hp') / GetStat(p, 'max_hp') - 1.35 / 0.95) < 0.001,
+    'class hp_mul applies: hound/wardancer max_hp ratio ' + F2S(GetStat(p2, 'max_hp') / GetStat(p, 'max_hp'), 4) + ' ~= ' + F2S(1.35 / 0.95, 4));
+  Check(Abs(GetStat(p2, 'max_mana') / GetStat(p, 'max_mana') - 0.6 / 0.7) < 0.001,
+    'class mana_mul applies: hound/wardancer max_mana ratio ' + F2S(GetStat(p2, 'max_mana') / GetStat(p, 'max_mana'), 4) + ' ~= ' + F2S(0.6 / 0.7, 4));
+  Check(Abs(GetStat(p2, 'max_stamina') / GetStat(p, 'max_stamina') - 1.1 / 1.2) < 0.001,
+    'class stam_mul applies: hound/wardancer max_stamina ratio ' + F2S(GetStat(p2, 'max_stamina') / GetStat(p, 'max_stamina'), 4) + ' ~= ' + F2S(1.1 / 1.2, 4));
+  // direct: doubling the muls scales the un-multiplied base by 2.0
+  ci := FindClass('wardancer');
+  savedMul := GClasses[ci].hpMul;
+  savedManaMul := GClasses[ci].manaMul;
+  savedStamMul := GClasses[ci].stamMul;
+  baseHp := GetStat(p, 'max_hp');
+  baseMana := GetStat(p, 'max_mana');
+  baseStam := GetStat(p, 'max_stamina');
+  GClasses[ci].hpMul := 2.0;
+  GClasses[ci].manaMul := 2.0;
+  GClasses[ci].stamMul := 2.0;
+  RecalcStats(p);
+  Check((Abs(GetStat(p, 'max_hp') - baseHp / savedMul * 2.0) < 0.01) and
+        (Abs(GetStat(p, 'max_mana') - baseMana / savedManaMul * 2.0) < 0.01) and
+        (Abs(GetStat(p, 'max_stamina') - baseStam / savedStamMul * 2.0) < 0.01),
+    'changing class muls changes max_hp/mana/stamina (2x mul -> 2x unmul base)');
+  GClasses[ci].hpMul := savedMul;
+  GClasses[ci].manaMul := savedManaMul;
+  GClasses[ci].stamMul := savedStamMul;
+  RecalcStats(p);
+  Check(Abs(GetStat(p, 'max_hp') - baseHp) < 0.01, 'class muls restored, max_hp back to base');
 
   { ---- done ---- }
   TLog(Format('=== selftest done: %d passed, %d failed ===', [gPass, gFail]));
